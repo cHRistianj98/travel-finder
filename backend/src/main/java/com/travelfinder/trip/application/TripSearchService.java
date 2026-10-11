@@ -30,8 +30,8 @@ public class TripSearchService {
         if (request.earliestOutboundDeparture().isAfter(request.latestOutboundDeparture())) {
             throw new IllegalArgumentException("Zakres godzin wyjazdu jest niepoprawny.");
         }
-        if (request.earliestReturnArrival().isAfter(request.latestReturnArrival())) {
-            throw new IllegalArgumentException("Zakres godzin powrotu jest niepoprawny.");
+        if (request.earliestReturnDeparture().isAfter(request.latestReturnDeparture())) {
+            throw new IllegalArgumentException("Zakres godzin wylotu powrotnego jest niepoprawny.");
         }
         if (!request.transportTypes().contains(TransportType.FLIGHT)) {
             throw new IllegalArgumentException("Na razie dostępne jest tylko wyszukiwanie prawdziwych lotów. Pociągi, autobusy i samochody dodamy później.");
@@ -54,10 +54,10 @@ public class TripSearchService {
                         .isBefore(request.earliestOutboundDeparture()))
                 .filter(option -> !option.outboundDeparture().toLocalTime()
                         .isAfter(request.latestOutboundDeparture()))
-                .filter(option -> !option.returnArrival().toLocalTime()
-                        .isBefore(request.earliestReturnArrival()))
-                .filter(option -> !option.returnArrival().toLocalTime()
-                        .isAfter(request.latestReturnArrival()))
+                .filter(option -> !option.returnDeparture().toLocalTime()
+                        .isBefore(request.earliestReturnDeparture()))
+                .filter(option -> !option.returnDeparture().toLocalTime()
+                        .isAfter(request.latestReturnDeparture()))
                 .filter(option -> option.timeAtDestinationMinutes() > 0)
                 .toList();
     }

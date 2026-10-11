@@ -145,7 +145,8 @@ public class TravelpayoutsCachedFlightProvider implements FlightSearchProvider {
                     .atZone(WARSAW).toOffsetDateTime();
             long stay = Duration.between(arrival.toInstant(), returnDepart.toInstant()).toMinutes();
 
-            // Daty okna: data WYLOTU z Polski, data POWROTU do Polski.
+            // Okno wolnego: start lotu z Polski i PRZYLOT do domu muszą mieścić się w dniach wolnych.
+            // Natomiast filtr godzin powrotu dotyczy STARTU z miasta docelowego.
             LocalDate startDay = depart.atZoneSameInstant(WARSAW).toLocalDate();
             LocalDate lastDay = returnArrival.toLocalDate();
             if (!availability.allowsTrip(startDay, lastDay) || stay <= 0) return java.util.Optional.empty();
@@ -153,8 +154,8 @@ public class TravelpayoutsCachedFlightProvider implements FlightSearchProvider {
             if (BigDecimal.valueOf(price).compareTo(req.maxTransportBudget()) > 0) return java.util.Optional.empty();
             if (depart.toLocalTime().isBefore(req.earliestOutboundDeparture())
                     || depart.toLocalTime().isAfter(req.latestOutboundDeparture())
-                    || returnArrival.toLocalTime().isBefore(req.earliestReturnArrival())
-                    || returnArrival.toLocalTime().isAfter(req.latestReturnArrival())) {
+                    || returnDepart.toLocalTime().isBefore(req.earliestReturnDeparture())
+                    || returnDepart.toLocalTime().isAfter(req.latestReturnDeparture())) {
                 return java.util.Optional.empty();
             }
 

@@ -33,8 +33,8 @@ export function TripSearchForm({ onSearch, loading }: Props) {
     availableDates: datesBetween(DEFAULT_WEEKEND.outboundDate, DEFAULT_WEEKEND.returnDate),
     earliestOutboundDeparture: '15:00',
     latestOutboundDeparture: '23:00',
-    earliestReturnArrival: '15:00',
-    latestReturnArrival: '23:00',
+    earliestReturnDeparture: '15:00',
+    latestReturnDeparture: '23:00',
     maxTransportBudget: 500,
     currency: 'PLN',
     transportTypes: ['FLIGHT'],
@@ -55,8 +55,8 @@ export function TripSearchForm({ onSearch, loading }: Props) {
       ...previous,
       earliestOutboundDeparture: '00:00',
       latestOutboundDeparture: '23:30',
-      earliestReturnArrival: '00:00',
-      latestReturnArrival: '23:30',
+      earliestReturnDeparture: '00:00',
+      latestReturnDeparture: '23:30',
       maxTransportBudget: 2000,
       directOnly: false,
       transportTypes: ['FLIGHT'],
@@ -102,8 +102,8 @@ export function TripSearchForm({ onSearch, loading }: Props) {
       setValidationError('Godzina końca wyjazdu musi być późniejsza niż jego początek.');
       return;
     }
-    if (form.earliestReturnArrival > form.latestReturnArrival) {
-      setValidationError('Godzina końca powrotu musi być późniejsza niż jego początek.');
+    if (form.earliestReturnDeparture > form.latestReturnDeparture) {
+      setValidationError('Koniec przedziału wylotu powrotnego nie może być wcześniejszy niż początek.');
       return;
     }
 
@@ -177,8 +177,8 @@ export function TripSearchForm({ onSearch, loading }: Props) {
           <div className="time-block">
             <div className="time-block-header">
               <div>
-                <strong>Powrót do domu</strong>
-                <span>Godziny przylotu do domu, w dniu powrotu</span>
+                <strong>Wylot powrotny</strong>
+                <span>Godziny startu z miasta docelowego (czas lokalny). Przylot do domu musi zmieścić się w zaznaczonych dniach wolnych.</span>
               </div>
               <Icon name="hourglass" size={18} />
             </div>
@@ -187,20 +187,20 @@ export function TripSearchForm({ onSearch, loading }: Props) {
                 <label className="field-label subtle-label">Od</label>
                 <DropdownSelect
                   icon="clock"
-                  value={form.earliestReturnArrival}
+                  value={form.earliestReturnDeparture}
                   options={TIME_OPTIONS}
-                  onChange={value => update('earliestReturnArrival', value)}
-                  ariaLabel="Najwcześniejsza godzina powrotu"
+                  onChange={value => update('earliestReturnDeparture', value)}
+                  ariaLabel="Najwcześniejsza godzina wylotu powrotnego z miejsca pobytu"
                 />
               </div>
               <div>
                 <label className="field-label subtle-label">Do</label>
                 <DropdownSelect
                   icon="clock"
-                  value={form.latestReturnArrival}
+                  value={form.latestReturnDeparture}
                   options={TIME_OPTIONS}
-                  onChange={value => update('latestReturnArrival', value)}
-                  ariaLabel="Najpóźniejsza godzina powrotu"
+                  onChange={value => update('latestReturnDeparture', value)}
+                  ariaLabel="Najpóźniejsza godzina wylotu powrotnego z miejsca pobytu"
                 />
               </div>
             </div>

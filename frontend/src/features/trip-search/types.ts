@@ -7,8 +7,8 @@ export interface TripSearchRequest {
   availableDates: string[]; // Konkretne wolne dni YYYY-MM-DD, również rozłączne okresy
   earliestOutboundDeparture: string; // HH:mm
   latestOutboundDeparture: string; // HH:mm
-  earliestReturnArrival: string; // HH:mm
-  latestReturnArrival: string; // HH:mm
+  earliestReturnDeparture: string; // HH:mm
+  latestReturnDeparture: string; // HH:mm
   maxTransportBudget: number;
   currency: 'PLN';
   transportTypes: TransportType[];

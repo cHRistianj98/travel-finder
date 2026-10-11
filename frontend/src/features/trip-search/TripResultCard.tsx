@@ -50,11 +50,32 @@ export function TripResultCard({ trip, index }: { trip: TripOption; index: numbe
 
       <div className="trip-card-body">
         <div className="trip-price-row"><div><span className="micro-label">Cena orientacyjna</span><strong>{formatPrice(trip.price, trip.currency)}</strong><small>transport w obie strony</small></div></div>
-        <div className="trip-route"><div className="route-stop"><span className="route-stop-top">WYJAZD</span><strong>{formatTime(trip.outboundDeparture)}</strong><span>{formatWeekday(trip.outboundDeparture)}, {formatDate(trip.outboundDeparture)}</span></div><div className="route-mid"><div className={`route-line route-line-${TRANSPORT_THEMES[trip.transportType]}`}><span /><Icon name={TRANSPORT_ICONS[trip.transportType]} size={17} /><span /></div><small>{trip.origin}</small></div><div className="route-stop route-stop-end"><span className="route-stop-top">POWRÓT</span><strong>{formatTime(trip.returnArrival)}</strong><span>{formatWeekday(trip.returnArrival)}, {formatDate(trip.returnArrival)}</span></div></div>
+        <div className="trip-route">
+          <div className="route-stop">
+            <span className="route-stop-top">WYLOT Z DOMU</span>
+            <strong>{formatTime(trip.outboundDeparture)}</strong>
+            <span>{formatWeekday(trip.outboundDeparture)}, {formatDate(trip.outboundDeparture)}</span>
+          </div>
+          <div className="route-mid">
+            <div className={`route-line route-line-${TRANSPORT_THEMES[trip.transportType]}`}>
+              <span /><Icon name={TRANSPORT_ICONS[trip.transportType]} size={17} /><span />
+            </div>
+            <small>{trip.origin}</small>
+          </div>
+          <div className="route-stop route-stop-end">
+            <span className="route-stop-top">WYLOT POWROTNY</span>
+            <strong>{formatTime(trip.returnDeparture)}</strong>
+            <span>{formatWeekday(trip.returnDeparture)}, {formatDate(trip.returnDeparture)}</span>
+          </div>
+        </div>
+        <div className="trip-return-arrival">
+          <Icon name="clock" size={13} />
+          <span>Przylot do {trip.origin}: <strong>{formatTime(trip.returnArrival)}</strong> · {formatWeekday(trip.returnArrival)}, {formatDate(trip.returnArrival)}</span>
+        </div>
         <div className="trip-facts"><span className="stay-highlight"><Icon name="hourglass" size={15} /> <strong>{stayHours} godz.</strong> na miejscu</span><span className={`trip-fact trip-fact-${TRANSPORT_THEMES[trip.transportType]}`}><Icon name={allDirect ? 'check' : 'route'} size={15} /> {allDirect ? 'Bez przesiadek' : 'Z przesiadką'}</span></div>
         {expanded && <div className="trip-details" id={`details-${trip.id}`}>
           <div className="detail-line"><span>Podróż tam</span><strong>{formatTime(trip.outboundDeparture)} – {formatTime(trip.outboundArrival)}</strong></div>
-          <div className="detail-line"><span>Podróż z powrotem</span><strong>{formatTime(trip.returnDeparture)} – {formatTime(trip.returnArrival)}</strong></div>
+          <div className="detail-line"><span>Powrót (start w {trip.destination} → przylot do {trip.origin})</span><strong>{formatTime(trip.returnDeparture)} – {formatTime(trip.returnArrival)}</strong></div>
           <div className="detail-line"><span>Łącznie w podróży</span><strong>{durationLabel(trip.totalTravelDurationMinutes)}</strong></div>
           <div className="detail-line"><span>Przesiadki tam / powrót</span><strong>{trip.outboundTransfers} / {trip.returnTransfers}</strong></div>
           <div className="live-detail-note"><Icon name="info" size={14} /> Historyczna oferta znaleziona przez użytkowników Aviasales. Cena, dostępność i zasady bagażowe mogą się zmienić. Kliknij poniżej, aby sprawdzić bieżącą ofertę przed zakupem.</div>

@@ -237,8 +237,8 @@ public class SearchApiFlightProvider implements FlightSearchProvider {
                 // dotarcia do domu. Powrót może wylądować następnego dnia.
                 if (!back.departure().toLocalDate().equals(pair.returnDeparture())) continue;
                 if (back.arrival().toLocalDate().isAfter(request.returnDate())) continue;
-                if (!within(back.arrival().toLocalTime(), request.earliestReturnArrival(),
-                        request.latestReturnArrival())) continue;
+                if (!within(back.departure().toLocalTime(), request.earliestReturnDeparture(),
+                        request.latestReturnDeparture())) continue;
                 BigDecimal finalPrice = back.price(); // Cena całego round_trip po departure_token.
                 if (finalPrice == null || finalPrice.compareTo(request.maxTransportBudget()) > 0) continue;
                 long stay = Duration.between(outbound.arrival().toInstant(), back.departure().toInstant()).toMinutes();

@@ -159,6 +159,9 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .route-line { display: flex; align-items: center; gap: 2px; width: 100%; color: #71956b; }
 .route-line span { height: 1px; flex: 1; border-top: 1px dashed #a8b7a6; }
 .route-mid small { font-size: 8px; color: #8b988d; white-space: nowrap; }
+.trip-return-arrival { display: flex; align-items: center; justify-content: flex-end; gap: 5px; padding: 8px 3px 0; color: #708478; font-size: 10px; text-align: right; }
+.trip-return-arrival strong { color: #315c44; font-weight: 800; }
+.trip-return-arrival svg { flex: 0 0 auto; }
 .trip-facts { display: flex; justify-content: space-between; gap: 5px; align-items: center; padding: 15px 1px 14px; color: #566d58; font-size: 10px; }
 .trip-facts > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .stay-highlight { color: #335f48; }

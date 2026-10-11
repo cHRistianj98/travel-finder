@@ -1,152 +1,132 @@
-@echo off
-setlocal EnableExtensions EnableDelayedExpansion
-
-set "PROJECT_DIR=C:\projekty\travel-finder"
-set "COMPOSE_FILE=%PROJECT_DIR%\infra\docker-compose.yml"
-set "CONTAINER_NAME=travel-finder-postgres"
-set "POSTGRES_HOST_PORT=5434"
-set "DOCKER_DESKTOP_EXE=C:\Program Files\Docker\Docker\Docker Desktop.exe"
-
-if not exist "%PROJECT_DIR%" (
-  echo [ERROR] Folder projektu nie istnieje: %PROJECT_DIR%
-  pause
-  exit /b 1
-)
-
-cd /d "%PROJECT_DIR%"
-
-echo.
-echo ==============================================
-echo   Travel Finder - START
- echo ==============================================
-echo.
-
-call :ensureDockerDesktop || goto :fail
-call :ensureDockerEngine || goto :fail
-call :startPostgres || goto :fail
-call :ensureFrontendDependencies || goto :fail
-call :startBackend
-call :startFrontend
-
-echo.
-echo [OK] Travel Finder uruchomiony.
-echo [INFO] Frontend: http://localhost:5173
-echo [INFO] Backend : http://localhost:8081
-echo [INFO] Postgres: localhost:%POSTGRES_HOST_PORT%
-echo.
-pause
-exit /b 0
-
-:ensureDockerDesktop
-set "DOCKER_RUNNING="
-for /f "tokens=*" %%i in ('tasklist ^| find /I "Docker Desktop.exe"') do set "DOCKER_RUNNING=1"
-if defined DOCKER_RUNNING (
-  echo [INFO] Docker Desktop juz dziala.
-  exit /b 0
-)
-
-if exist "%DOCKER_DESKTOP_EXE%" (
-  echo [INFO] Uruchamiam Docker Desktop...
-  start "" "%DOCKER_DESKTOP_EXE%"
-  exit /b 0
-)
-
-echo [WARN] Nie znaleziono Docker Desktop w standardowej sciezce.
-echo [WARN] Sprobuję kontynuowac - jesli Docker nie ruszy, uruchom go recznie.
-exit /b 0
-
-:ensureDockerEngine
-echo [INFO] Czekam na Docker Engine...
-set /a attempts=0
-:waitDocker
-set /a attempts+=1
-docker info >nul 2>&1 && (
-  echo [OK] Docker Engine gotowy.
-  exit /b 0
-)
-if !attempts! GEQ 60 (
-  echo [ERROR] Docker Engine nie odpowiada.
-  exit /b 1
-)
-timeout /t 2 >nul
-goto :waitDocker
-
-:startPostgres
-echo [INFO] Uruchamiam PostgreSQL przez docker compose...
-docker compose -f "%COMPOSE_FILE%" up -d postgres
-if errorlevel 1 (
-  echo [ERROR] Nie udalo sie uruchomic kontenera PostgreSQL.
-  exit /b 1
-)
-
-echo [INFO] Czekam na healthcheck kontenera...
-set /a healthAttempts=0
-:waitHealth
-set "PG_HEALTH="
-for /f "usebackq delims=" %%i in (`docker inspect -f "{{.State.Health.Status}}" %CONTAINER_NAME% 2^>nul`) do set "PG_HEALTH=%%i"
-if /I "!PG_HEALTH!"=="healthy" goto :verifyPort
-set /a healthAttempts+=1
-if !healthAttempts! GEQ 40 (
-  echo [ERROR] PostgreSQL nie osiagnal statusu healthy.
-  exit /b 1
-)
-timeout /t 2 >nul
-goto :waitHealth
-
-:verifyPort
-set "PORT_OK="
-for /f "usebackq delims=" %%i in (`docker port %CONTAINER_NAME% 5432 2^>nul`) do (
-  echo [INFO] Mapowanie portu: %%i
-  echo %%i | findstr /C:":%POSTGRES_HOST_PORT%" >nul && set "PORT_OK=1"
-)
-if not defined PORT_OK (
-  echo [ERROR] PostgreSQL nie jest wystawiony na localhost port %POSTGRES_HOST_PORT%.
-  echo [INFO] Aktualny docker-compose powinien miec: %POSTGRES_HOST_PORT%:5432
-  exit /b 1
-)
-
-echo [OK] PostgreSQL gotowy na porcie %POSTGRES_HOST_PORT%.
-exit /b 0
-
-:ensureFrontendDependencies
-if exist "%PROJECT_DIR%\frontend\node_modules" (
-  echo [INFO] Zaleznosci frontendu juz istnieja.
-  exit /b 0
-)
-
-echo [INFO] Instaluje zaleznosci frontendu (npm install)...
-cd /d "%PROJECT_DIR%\frontend"
-call npm install
-if errorlevel 1 (
-  echo [ERROR] npm install zakonczyl sie bledem.
-  exit /b 1
-)
-cd /d "%PROJECT_DIR%"
-exit /b 0
-
-:startBackend
-tasklist /v | findstr /I /C:"Travel Finder Backend" >nul
-if not errorlevel 1 (
-  echo [INFO] Backend juz jest uruchomiony.
-  exit /b 0
-)
-echo [INFO] Uruchamiam backend...
-start "Travel Finder Backend" /D "%PROJECT_DIR%\backend" cmd.exe /k "title Travel Finder Backend & mvn spring-boot:run"
-exit /b 0
-
-:startFrontend
-tasklist /v | findstr /I /C:"Travel Finder Frontend" >nul
-if not errorlevel 1 (
-  echo [INFO] Frontend juz jest uruchomiony.
-  exit /b 0
-)
-echo [INFO] Uruchamiam frontend...
-start "Travel Finder Frontend" /D "%PROJECT_DIR%\frontend" cmd.exe /k "title Travel Finder Frontend & npm run dev"
-exit /b 0
-
-:fail
-echo.
-echo [ERROR] Start aplikacji nie powiodl sie.
-echo.
-pause
-exit /b 1
+@echo off
+setlocal EnableExtensions EnableDelayedExpansion
+
+set "ROOT=C:\projekty\travel-finder"
+set "COMPOSE_FILE=%ROOT%\infra\docker-compose.yml"
+set "STATE_DIR=%ROOT%\.travel-finder-runtime"
+set "DOCKER_DESKTOP=C:\Program Files\Docker\Docker\Docker Desktop.exe"
+
+cd /d "%ROOT%" 2>nul || goto BAD_PROJECT
+if not exist "%COMPOSE_FILE%" goto BAD_COMPOSE
+if not exist "%ROOT%\backend\pom.xml" goto BAD_PROJECT
+if not exist "%ROOT%\frontend\package.json" goto BAD_PROJECT
+if not exist "%STATE_DIR%" mkdir "%STATE_DIR%"
+
+echo.
+echo ==========================================
+echo          TRAVEL FINDER - START
+echo ==========================================
+echo.
+echo [Travel Finder] Sprawdzam Docker Engine...
+
+docker info >nul 2>&1
+if not errorlevel 1 goto DOCKER_READY
+
+echo [Travel Finder] Uruchamiam Docker Desktop...
+if not exist "%DOCKER_DESKTOP%" goto BAD_DOCKER
+start "" "%DOCKER_DESKTOP%"
+set /a WAITED=0
+:WAIT_FOR_DOCKER
+docker info >nul 2>&1
+if not errorlevel 1 goto DOCKER_READY
+if !WAITED! GEQ 120 goto DOCKER_TIMEOUT
+timeout /t 2 /nobreak >nul
+set /a WAITED+=2
+goto WAIT_FOR_DOCKER
+
+:DOCKER_READY
+echo [Travel Finder] Docker Engine gotowy.
+echo [Travel Finder] Uruchamiam PostgreSQL (localhost:5434)...
+docker compose -f "%COMPOSE_FILE%" up -d postgres
+if errorlevel 1 goto DB_ERROR
+
+rem Czekamy na PostgreSQL tylko wtedy, gdy baza jeszcze startuje.
+set /a WAITED=0
+:WAIT_FOR_DB
+docker exec travel-finder-postgres pg_isready -U travel_finder -d travel_finder >nul 2>&1
+if not errorlevel 1 goto DB_READY
+if !WAITED! GEQ 30 goto DB_TIMEOUT
+timeout /t 1 /nobreak >nul
+set /a WAITED+=1
+goto WAIT_FOR_DB
+
+:DB_READY
+echo [Travel Finder] PostgreSQL gotowy.
+if not exist "%ROOT%\frontend\node_modules\.bin\vite.cmd" goto NPM_MISSING
+
+echo [Travel Finder] Uruchamiam backend i frontend w osobnych oknach...
+call :START_BACKEND
+if errorlevel 1 goto START_ERROR
+call :START_FRONTEND
+if errorlevel 1 goto START_ERROR
+
+echo.
+echo [OK] Uruchomiono Travel Finder.
+echo      Frontend   http://localhost:5173
+echo      Backend    http://localhost:8081
+echo      PostgreSQL localhost:5434
+echo.
+exit /b 0
+
+:START_BACKEND
+set "BACKEND_PID="
+if exist "%STATE_DIR%\backend.pid" set /p "BACKEND_PID="<"%STATE_DIR%\backend.pid"
+if defined BACKEND_PID (
+  powershell -NoProfile -Command "$p = Get-CimInstance Win32_Process -Filter 'ProcessId = !BACKEND_PID!' -ErrorAction SilentlyContinue; if ($p -and $p.Name -eq 'cmd.exe' -and $p.CommandLine -like '*spring-boot:run*') { exit 0 } else { exit 1 }" >nul 2>&1
+  if not errorlevel 1 (
+    echo [Travel Finder] Backend juz uruchomiony (PID !BACKEND_PID!).
+    exit /b 0
+  )
+)
+set "BACKEND_PID="
+for /f "delims=" %%P in ('powershell -NoProfile -Command "$p = Start-Process -FilePath 'cmd.exe' -ArgumentList '/k', 'mvn spring-boot:run' -WorkingDirectory '%ROOT%\backend' -PassThru; $p.Id"') do set "BACKEND_PID=%%P"
+if not defined BACKEND_PID exit /b 1
+>"%STATE_DIR%\backend.pid" echo !BACKEND_PID!
+echo [Travel Finder] Backend uruchomiony (PID !BACKEND_PID!).
+exit /b 0
+
+:START_FRONTEND
+set "FRONTEND_PID="
+if exist "%STATE_DIR%\frontend.pid" set /p "FRONTEND_PID="<"%STATE_DIR%\frontend.pid"
+if defined FRONTEND_PID (
+  powershell -NoProfile -Command "$p = Get-CimInstance Win32_Process -Filter 'ProcessId = !FRONTEND_PID!' -ErrorAction SilentlyContinue; if ($p -and $p.Name -eq 'cmd.exe' -and $p.CommandLine -like '*npm run dev*') { exit 0 } else { exit 1 }" >nul 2>&1
+  if not errorlevel 1 (
+    echo [Travel Finder] Frontend juz uruchomiony (PID !FRONTEND_PID!).
+    exit /b 0
+  )
+)
+set "FRONTEND_PID="
+for /f "delims=" %%P in ('powershell -NoProfile -Command "$p = Start-Process -FilePath 'cmd.exe' -ArgumentList '/k', 'npm run dev' -WorkingDirectory '%ROOT%\frontend' -PassThru; $p.Id"') do set "FRONTEND_PID=%%P"
+if not defined FRONTEND_PID exit /b 1
+>"%STATE_DIR%\frontend.pid" echo !FRONTEND_PID!
+echo [Travel Finder] Frontend uruchomiony (PID !FRONTEND_PID!).
+exit /b 0
+
+:BAD_PROJECT
+echo [ERROR] Brak katalogu lub plikow projektu: %ROOT%
+goto FAIL
+:BAD_COMPOSE
+echo [ERROR] Nie znaleziono pliku %COMPOSE_FILE%
+goto FAIL
+:BAD_DOCKER
+echo [ERROR] Nie znaleziono Docker Desktop: %DOCKER_DESKTOP%
+goto FAIL
+:DOCKER_TIMEOUT
+echo [ERROR] Docker Engine nie wystartowal w 120 sekund.
+goto FAIL
+:DB_ERROR
+echo [ERROR] Nie udalo sie uruchomic kontenera PostgreSQL.
+goto FAIL
+:DB_TIMEOUT
+echo [ERROR] PostgreSQL nie jest gotowy po 30 sekundach.
+goto FAIL
+:NPM_MISSING
+echo [ERROR] Brakuje zaleznosci frontendu. Wykonaj jednorazowo:
+echo         cd /d "%ROOT%\frontend" ^&^& npm install
+goto FAIL
+:START_ERROR
+echo [ERROR] Nie udalo sie uruchomic jednego z procesow.
+:FAIL
+echo.
+pause
+exit /b 1

@@ -15,8 +15,9 @@ public record TripSearchRequest(
         @NotNull(message = "Podaj datę powrotu") LocalDate returnDate,
         @NotNull(message = "Podaj najwcześniejszą godzinę wyjazdu") LocalTime earliestOutboundDeparture,
         @NotNull(message = "Podaj najpóźniejszą godzinę wyjazdu") LocalTime latestOutboundDeparture,
-        @NotNull(message = "Podaj najwcześniejszą godzinę powrotu") LocalTime earliestReturnArrival,
-        @NotNull(message = "Podaj najpóźniejszą godzinę powrotu") LocalTime latestReturnArrival,
+        // Godzina STARTU lotu powrotnego w strefie lokalnej miejsca docelowego.
+        @NotNull(message = "Podaj najwcześniejszą godzinę wylotu powrotnego") LocalTime earliestReturnDeparture,
+        @NotNull(message = "Podaj najpóźniejszą godzinę wylotu powrotnego") LocalTime latestReturnDeparture,
         @NotNull @DecimalMin(value = "0.01", message = "Budżet musi być większy od zera")
         BigDecimal maxTransportBudget,
         @NotBlank String currency,
@@ -32,11 +33,11 @@ public record TripSearchRequest(
     // Zachowujemy dotychczasowe wywołania w testach i starszych klientach API.
     public TripSearchRequest(String origin, LocalDate outboundDate, LocalDate returnDate,
             LocalTime earliestOutboundDeparture, LocalTime latestOutboundDeparture,
-            LocalTime earliestReturnArrival, LocalTime latestReturnArrival,
+            LocalTime earliestReturnDeparture, LocalTime latestReturnDeparture,
             BigDecimal maxTransportBudget, String currency, Set<TransportType> transportTypes,
             boolean directOnly) {
         this(origin, outboundDate, returnDate, earliestOutboundDeparture, latestOutboundDeparture,
-                earliestReturnArrival, latestReturnArrival, maxTransportBudget, currency,
+                earliestReturnDeparture, latestReturnDeparture, maxTransportBudget, currency,
                 transportTypes, directOnly, Set.of());
     }
 }
