@@ -9,7 +9,7 @@ export async function searchTrips(request: TripSearchRequest): Promise<TripOptio
       body: JSON.stringify(request),
     });
   } catch {
-    throw new Error('Brak połączenia z backendem. Sprawdź, czy Spring Boot działa na porcie 8080.');
+    throw new Error('Brak połączenia z backendem. Sprawdź, czy Spring Boot działa na porcie 8081.');
   }
 
   if (!response.ok) {

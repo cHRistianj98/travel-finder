@@ -1,5 +1,5 @@
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
-import { DayPicker, type DateRange } from 'react-day-picker';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { DayPicker } from 'react-day-picker';
 import { Icon, type IconName } from '../../components/Icon';
 import {
   POLISH_CITIES,
@@ -12,9 +12,9 @@ import 'react-day-picker/style.css';
 
 const TRANSPORTS: { type: TransportType; icon: IconName; title: string; subtitle: string; accent: string }[] = [
   { type: 'FLIGHT', icon: 'plane', title: 'Samolot', subtitle: 'Szybko i daleko', accent: 'flight' },
-  { type: 'TRAIN', icon: 'train', title: 'Pociąg', subtitle: 'Bez stresu', accent: 'train' },
-  { type: 'BUS', icon: 'bus', title: 'Autobus', subtitle: 'Budżetowo', accent: 'bus' },
-  { type: 'CAR', icon: 'car', title: 'Samochód', subtitle: 'Pełna swoboda', accent: 'car' },
+  { type: 'TRAIN', icon: 'train', title: 'Pociąg', subtitle: 'Wkrótce', accent: 'train' },
+  { type: 'BUS', icon: 'bus', title: 'Autobus', subtitle: 'Wkrótce', accent: 'bus' },
+  { type: 'CAR', icon: 'car', title: 'Samochód', subtitle: 'Wkrótce', accent: 'car' },
 ];
 
 const TIME_OPTIONS = createTimeOptions();
@@ -30,35 +30,48 @@ export function TripSearchForm({ onSearch, loading }: Props) {
     origin: 'Wrocław',
     outboundDate: DEFAULT_WEEKEND.outboundDate,
     returnDate: DEFAULT_WEEKEND.returnDate,
+    availableDates: datesBetween(DEFAULT_WEEKEND.outboundDate, DEFAULT_WEEKEND.returnDate),
     earliestOutboundDeparture: '15:00',
     latestOutboundDeparture: '23:00',
     earliestReturnArrival: '15:00',
     latestReturnArrival: '23:00',
     maxTransportBudget: 500,
     currency: 'PLN',
-    transportTypes: ['FLIGHT', 'TRAIN', 'BUS', 'CAR'],
+    transportTypes: ['FLIGHT'],
     directOnly: true,
   }));
   const [validationError, setValidationError] = useState<string | null>(null);
+  const freeDays = form.availableDates.length;
+  const datePairs = countPossiblePairs(form.availableDates);
+  const spanDays = daysInclusive(form.outboundDate, form.returnDate);
 
   function update<K extends keyof TripSearchRequest>(key: K, value: TripSearchRequest[K]) {
     setForm(previous => ({ ...previous, [key]: value }));
     setValidationError(null);
   }
 
-  function toggleTransport(type: TransportType) {
-    update('transportTypes', form.transportTypes.includes(type)
-      ? form.transportTypes.filter(item => item !== type)
-      : [...form.transportTypes, type]);
+  function setWideSearch() {
+    setForm(previous => ({
+      ...previous,
+      earliestOutboundDeparture: '00:00',
+      latestOutboundDeparture: '23:30',
+      earliestReturnArrival: '00:00',
+      latestReturnArrival: '23:30',
+      maxTransportBudget: 2000,
+      directOnly: false,
+      transportTypes: ['FLIGHT'],
+    }));
+    setValidationError(null);
   }
 
-  function handleDateRangeChange(range: DateRange | undefined) {
-    if (!range?.from || !range.to) {
-      return;
-    }
-    const outboundDate = toISODate(range.from);
-    const returnDate = toISODate(range.to);
-    setForm(previous => ({ ...previous, outboundDate, returnDate }));
+  function handleAvailabilityChange(days: string[]) {
+    const selected = [...new Set(days)].sort();
+    setForm(previous => ({
+      ...previous,
+      availableDates: selected,
+      outboundDate: selected[0] ?? previous.outboundDate,
+      returnDate: selected[selected.length - 1] ?? previous.returnDate,
+    }));
     setValidationError(null);
   }
 
@@ -69,12 +82,12 @@ export function TripSearchForm({ onSearch, loading }: Props) {
       setValidationError('Wybierz miasto, z którego chcesz wyjechać.');
       return;
     }
-    if (!form.outboundDate || !form.returnDate || form.returnDate < form.outboundDate) {
-      setValidationError('Wybierz poprawny zakres wyjazdu i powrotu.');
+    if (datePairs === 0) {
+      setValidationError('Zaznacz co najmniej dwa następujące po sobie wolne dni — bez łączenia osobnych weekendów.');
       return;
     }
-    if (form.outboundDate === form.returnDate) {
-      setValidationError('Na start potrzebujemy przynajmniej jednego noclegu — wybierz późniejszy powrót.');
+    if (spanDays > 62) {
+      setValidationError('W jednym wyszukiwaniu możesz wybrać dni w obrębie maksymalnie 62 dni kalendarzowych.');
       return;
     }
     if (!form.transportTypes.length) {
@@ -97,11 +110,6 @@ export function TripSearchForm({ onSearch, loading }: Props) {
     onSearch({ ...form, origin: form.origin.trim() });
   }
 
-  const selectedRange = useMemo<DateRange>(() => ({
-    from: parseISODate(form.outboundDate),
-    to: parseISODate(form.returnDate),
-  }), [form.outboundDate, form.returnDate]);
-
   return (
     <form className="search-card" id="wyszukiwarka" onSubmit={handleSubmit}>
       <div className="form-topline"><span><Icon name="sliders" size={16} /> TWOJE KRYTERIA</span><span className="form-step">01 — 03</span></div>
@@ -118,8 +126,18 @@ export function TripSearchForm({ onSearch, loading }: Props) {
           ariaLabel="Wybierz miasto wyjazdu"
         />
 
-        <label className="field-label">Zakres wyjazdu</label>
-        <DateRangeField range={selectedRange} onChange={handleDateRangeChange} />
+        <label className="field-label">Kiedy masz wolne?</label>
+        <AvailabilityDateField selected={form.availableDates} onChange={handleAvailabilityChange} />
+        <p className="flight-search-helper">Zaznacz pojedyncze dni, kilka weekendów lub cały miesiąc. Lot i powrót muszą mieścić się w jednym nieprzerwanym okresie wolnym.</p>
+        <div className="availability-hint" aria-live="polite">
+          <Icon name="calendar" size={16} />
+          <span>{spanDays > 62
+            ? `Wybrany okres obejmuje ${spanDays} dni — maksimum to 62 dni kalendarzowe.`
+            : datePairs > 0
+              ? `${freeDays} dni zaznaczonych · ${datePairs} ${datePairs === 1 ? 'możliwa para dat' : 'możliwych par dat'} podróży`
+              : 'Zaznacz co najmniej dwa kolejne wolne dni.'}</span>
+        </div>
+        <p className="availability-cost-note">Wyszukiwanie z cache Aviasales: najpierw zbiorczo pobieramy oferty, a następnie filtrujemy je lokalnie. Zmiana godzin i budżetu nie zużywa płatnych zapytań SearchApi.</p>
       </div>
 
       <div className="field-section divider-top">
@@ -129,7 +147,7 @@ export function TripSearchForm({ onSearch, loading }: Props) {
             <div className="time-block-header">
               <div>
                 <strong>Wyjazd</strong>
-                <span>Przedział godzin rozpoczęcia podróży</span>
+                <span>Godziny wylotu, w wybranym dniu</span>
               </div>
               <Icon name="clock" size={18} />
             </div>
@@ -160,7 +178,7 @@ export function TripSearchForm({ onSearch, loading }: Props) {
             <div className="time-block-header">
               <div>
                 <strong>Powrót do domu</strong>
-                <span>Przedział godzin dotarcia z powrotem</span>
+                <span>Godziny przylotu do domu, w dniu powrotu</span>
               </div>
               <Icon name="hourglass" size={18} />
             </div>
@@ -189,6 +207,10 @@ export function TripSearchForm({ onSearch, loading }: Props) {
           </div>
         </div>
 
+        <div className="flight-test-hint">
+          <span><Icon name="info" size={15} /> Brak wyników? Na próbę poluzuj filtry.</span>
+          <button type="button" className="flight-wide-button" onClick={setWideSearch}>Ustaw szerokie wyszukiwanie</button>
+        </div>
         <label className="field-label" htmlFor="budget">Maksymalny budżet na transport</label>
         <div className="input-shell budget-shell">
           <Icon name="wallet" size={19} />
@@ -206,9 +228,10 @@ export function TripSearchForm({ onSearch, loading }: Props) {
               <button
                 key={transport.type}
                 type="button"
-                className={`transport-choice transport-${transport.accent} ${selected ? 'selected' : ''}`}
+                className={`transport-choice transport-${transport.accent} ${selected ? 'selected' : ''} ${transport.type !== 'FLIGHT' ? 'coming-soon' : ''}`}
                 aria-pressed={selected}
-                onClick={() => toggleTransport(transport.type)}
+                disabled
+                title={transport.type === 'FLIGHT' ? 'Loty są dostępne' : 'Ten transport dołączymy po integracji prawdziwego API'}
               >
                 <span className="transport-icon"><Icon name={transport.icon} size={20} /></span>
                 <span className="transport-name"><strong>{transport.title}</strong><small>{transport.subtitle}</small></span>
@@ -222,7 +245,7 @@ export function TripSearchForm({ onSearch, loading }: Props) {
 
       {validationError && <p className="form-error" role="alert"><Icon name="alert" size={16} />{validationError}</p>}
       <button className="submit-button" type="submit" disabled={loading}>{loading ? <><span className="button-spinner" />Szukam kierunków...</> : <><Icon name="search" size={20} /> Odkryj kierunki <Icon name="arrow-right" size={20} className="submit-arrow" /></>}</button>
-      <div className="form-disclaimer"><Icon name="info" size={14} /> Na razie pokazujemy przykładowe połączenia demonstracyjne, ale już w docelowym flow aplikacji.</div>
+      <div className="form-disclaimer"><Icon name="info" size={14} /> Ceny orientacyjne z wcześniejszych wyszukiwań Aviasales — mogą być już nieaktualne. Dostępność i cenę sprawdzisz po otwarciu oferty. Pozostałe środki transportu dodamy później.</div>
     </form>
   );
 }
@@ -298,124 +321,114 @@ function DropdownSelect({
   );
 }
 
-function DateRangeField({ range, onChange }: { range: DateRange; onChange: (range: DateRange | undefined) => void }) {
+function AvailabilityDateField({ selected, onChange }: {
+  selected: string[];
+  onChange: (days: string[]) => void;
+}) {
   const [open, setOpen] = useState(false);
-  const [draftRange, setDraftRange] = useState<DateRange | undefined>(range);
+  const [draft, setDraft] = useState<string[]>(selected);
+  const [displayMonth, setDisplayMonth] = useState(() => parseISODate(selected[0] ?? toISODate(new Date())));
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    setDraftRange(range);
-  }, [range.from?.getTime(), range.to?.getTime()]);
+    if (!open) return;
+    function closeOnOutside(event: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', closeOnOutside);
+    return () => document.removeEventListener('mousedown', closeOnOutside);
+  }, [open]);
 
-  useEffect(() => {
-    function closeAndMaybeApply(event: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
-        if (draftRange?.from && draftRange.to) {
-          onChange(draftRange);
-        }
-        setOpen(false);
+  const draftSorted = [...draft].sort();
+  const draftSpan = draftSorted.length ? daysInclusive(draftSorted[0], draftSorted[draftSorted.length - 1]) : 0;
+  const draftPairs = countPossiblePairs(draftSorted);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const monthLabel = new Intl.DateTimeFormat('pl-PL', { month: 'long', year: 'numeric' }).format(displayMonth);
+  const triggerLabel = selected.length === 0 ? 'Wybierz swoje wolne dni'
+    : `${selected.length} dni wolnych · ${formatDateLong(selected[0])}${selected.length > 1 ? ` – ${formatDateLong(selected[selected.length - 1])}` : ''}`;
+
+  function selectPreset(weekendsOnly: boolean) {
+    const year = displayMonth.getFullYear();
+    const month = displayMonth.getMonth();
+    const days: string[] = [];
+    for (let day = new Date(year, month, 1); day.getMonth() === month; day.setDate(day.getDate() + 1)) {
+      if (day >= today && (!weekendsOnly || day.getDay() === 0 || day.getDay() === 6)) {
+        days.push(toISODate(day));
       }
     }
-
-    document.addEventListener('mousedown', closeAndMaybeApply);
-    return () => document.removeEventListener('mousedown', closeAndMaybeApply);
-  }, [draftRange, onChange]);
-
-  const label = range.from && range.to
-    ? `${formatDateLong(toISODate(range.from))} — ${formatDateLong(toISODate(range.to))}`
-    : 'Wybierz zakres dat';
-
-  const draftLabelFrom = draftRange?.from ? formatDateLong(toISODate(draftRange.from)) : 'Brak wyjazdu';
-  const draftLabelTo = draftRange?.to ? formatDateLong(toISODate(draftRange.to)) : 'Brak powrotu';
-  const canConfirm = Boolean(draftRange?.from && draftRange.to);
+    setDraft(days);
+  }
 
   return (
-    <div className={`date-range-field ${open ? 'open' : ''}`} ref={rootRef}>
+    <div className={`date-range-field availability-field ${open ? 'open' : ''}`} ref={rootRef}>
       <button
         type="button"
         className="date-range-trigger input-shell"
+        aria-expanded={open}
+        aria-label="Wybierz wolne dni w kalendarzu"
         onClick={() => {
-          setDraftRange(range);
+          setDraft(selected);
+          setDisplayMonth(parseISODate(selected[0] ?? toISODate(new Date())));
           setOpen(previous => !previous);
         }}
-        aria-expanded={open}
       >
         <Icon name="calendar" size={18} />
-        <span className="date-range-text">{label}</span>
+        <span className="date-range-text">{triggerLabel}</span>
         <Icon name="chevron-down" size={18} className="dropdown-chevron" />
       </button>
       {open && (
-        <div className="date-range-popover" role="dialog" aria-label="Wybór zakresu dat">
+        <div className="date-range-popover availability-popover" role="dialog" aria-label="Kalendarz dni wolnych">
           <div className="date-range-popover-header">
-            <div>
-              <strong>Wybierz weekend lub przedział</strong>
-              <span>Kliknij datę wyjazdu, a potem datę powrotu. Okno zamknie się dopiero po kliknięciu OK lub poza nim.</span>
-            </div>
+            <strong>Kiedy możesz podróżować?</strong>
+            <span>Klikaj dowolne dni, aby je zaznaczać i odznaczać. Możesz wybrać kilka oddzielnych weekendów.</span>
           </div>
+          <div className="availability-presets" aria-label="Szybkie zaznaczanie dat">
+            <button type="button" onClick={() => selectPreset(false)}>Cały miesiąc</button>
+            <button type="button" onClick={() => selectPreset(true)}>Weekendy</button>
+            <button type="button" onClick={() => setDraft([])}>Wyczyść</button>
+          </div>
+          <p className="availability-month-note">Szybki wybór dotyczy: <strong>{monthLabel}</strong>. Minione dni są pomijane.</p>
           <DayPicker
-            mode="range"
-            selected={draftRange}
-            onSelect={setDraftRange}
-            numberOfMonths={2}
-            pagedNavigation
+            mode="multiple"
+            selected={draft.map(parseISODate)}
+            onSelect={dates => setDraft((dates ?? []).map(toISODate).sort())}
+            month={displayMonth}
+            onMonthChange={setDisplayMonth}
+            numberOfMonths={1}
             weekStartsOn={1}
-            min={1}
-            defaultMonth={draftRange?.from ?? range.from}
+            disabled={{ before: today }}
             className="travel-daypicker"
             classNames={{
-              months: 'travel-months',
-              month: 'travel-month',
-              month_caption: 'travel-month-caption',
-              caption_label: 'travel-caption-label',
-              nav: 'travel-nav',
-              button_previous: 'travel-nav-button',
-              button_next: 'travel-nav-button',
-              weekdays: 'travel-weekdays',
-              weekday: 'travel-weekday',
-              week: 'travel-week',
-              day: 'travel-day-cell',
-              day_button: 'travel-day-button',
-              selected: 'travel-day-selected',
-              range_start: 'travel-day-range-start',
-              range_middle: 'travel-day-range-middle',
-              range_end: 'travel-day-range-end',
-              today: 'travel-day-today',
-              outside: 'travel-day-outside',
+              months: 'travel-months', month: 'travel-month',
+              month_caption: 'travel-month-caption', caption_label: 'travel-caption-label',
+              nav: 'travel-nav', button_previous: 'travel-nav-button', button_next: 'travel-nav-button',
+              weekdays: 'travel-weekdays', weekday: 'travel-weekday', week: 'travel-week',
+              day: 'travel-day-cell', day_button: 'travel-day-button',
+              selected: 'travel-day-selected', today: 'travel-day-today', outside: 'travel-day-outside',
+              disabled: 'travel-day-disabled',
             }}
           />
-          <div className="date-range-summary">
-            <span>
-              <strong>{draftLabelFrom}</strong>
-              <small>Wyjazd</small>
-            </span>
-            <span>
-              <strong>{draftLabelTo}</strong>
-              <small>Powrót</small>
-            </span>
+          <div className="availability-calendar-summary" aria-live="polite">
+            <span><strong>{draft.length}</strong> wybranych dni</span>
+            <span><strong>{draftPairs}</strong> możliwych par dat</span>
           </div>
+          {draft.length > 0 && draftPairs === 0 && (
+            <p className="availability-calendar-warning">Zaznacz co najmniej dwa kolejne dni — pojedyncze dni nie wystarczą na nocleg.</p>
+          )}
+          {draftSpan > 62 && (
+            <p className="availability-calendar-warning">Wybrany okres jest zbyt długi ({draftSpan} dni). Maksimum to 62 dni.</p>
+          )}
           <div className="date-range-actions">
-            <button
-              type="button"
-              className="inline-secondary-button"
-              onClick={() => {
-                setDraftRange(range);
-                setOpen(false);
-              }}
-            >
-              Anuluj
-            </button>
+            <button type="button" className="inline-secondary-button" onClick={() => setOpen(false)}>Anuluj</button>
             <button
               type="button"
               className="inline-primary-button"
-              disabled={!canConfirm}
-              onClick={() => {
-                if (draftRange?.from && draftRange.to) {
-                  onChange(draftRange);
-                  setOpen(false);
-                }
-              }}
+              disabled={draftPairs === 0 || draftSpan > 62}
+              onClick={() => { onChange(draftSorted); setOpen(false); }}
             >
-              OK
+              Zastosuj dni wolne
             </button>
           </div>
         </div>
@@ -442,4 +455,38 @@ function toISODate(date: Date): string {
 function parseISODate(value: string): Date {
   const [year, month, day] = value.split('-').map(Number);
   return new Date(year, month - 1, day);
+}
+
+function daysInclusive(from: string, to: string): number {
+  if (!from || !to) return 0;
+  const begin = Date.parse(`${from}T00:00:00Z`);
+  const end = Date.parse(`${to}T00:00:00Z`);
+  if (!Number.isFinite(begin) || !Number.isFinite(end)) return 0;
+  return Math.max(0, Math.round((end - begin) / 86_400_000) + 1);
+}
+
+function datesBetween(from: string, to: string): string[] {
+  const current = parseISODate(from);
+  const end = parseISODate(to);
+  const dates: string[] = [];
+  while (current <= end) {
+    dates.push(toISODate(current));
+    current.setDate(current.getDate() + 1);
+  }
+  return dates;
+}
+
+/** Oddzielne weekendy liczymy osobno: nie łączymy ich w jeden długi urlop. */
+function countPossiblePairs(days: string[]): number {
+  const sorted = [...new Set(days)].sort();
+  let pairs = 0;
+  let streak = 0;
+  let previous = '';
+  for (const day of sorted) {
+    if (previous && daysInclusive(previous, day) === 2) streak++;
+    else streak = 1;
+    pairs += streak - 1;
+    previous = day;
+  }
+  return pairs;
 }

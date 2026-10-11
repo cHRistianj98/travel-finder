@@ -4,6 +4,7 @@ export interface TripSearchRequest {
   origin: string;
   outboundDate: string; // YYYY-MM-DD
   returnDate: string; // YYYY-MM-DD
+  availableDates: string[]; // Konkretne wolne dni YYYY-MM-DD, również rozłączne okresy
   earliestOutboundDeparture: string; // HH:mm
   latestOutboundDeparture: string; // HH:mm
   earliestReturnArrival: string; // HH:mm
@@ -65,7 +66,7 @@ export const DESTINATION_META: Record<string, {
   },
   Mediolan: {
     subtitle: 'Włoskie dolce vita', country: 'Włochy', palette: 'lilac',
-    image: 'https://images.unsplash.com/photo-1513326738677-b964603b136d?auto=format&fit=crop&w=1100&q=85',
+    image: '', // Nie pokazujemy zdjęcia innego miasta jako Mediolanu
   },
   Drezno: {
     subtitle: 'Sztuka tuż za granicą', country: 'Niemcy', palette: 'sand',

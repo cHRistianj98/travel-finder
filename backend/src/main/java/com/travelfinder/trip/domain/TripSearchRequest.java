@@ -21,6 +21,22 @@ public record TripSearchRequest(
         BigDecimal maxTransportBudget,
         @NotBlank String currency,
         @NotEmpty(message = "Wybierz przynajmniej jeden środek transportu") Set<TransportType> transportTypes,
-        boolean directOnly
+        boolean directOnly,
+        // Opcjonalne: brak pola w starszym kliencie oznacza wszystkie dni w podanym przedziale.
+        Set<LocalDate> availableDates
 ) {
+    public TripSearchRequest {
+        availableDates = availableDates == null ? Set.of() : Set.copyOf(availableDates);
+    }
+
+    // Zachowujemy dotychczasowe wywołania w testach i starszych klientach API.
+    public TripSearchRequest(String origin, LocalDate outboundDate, LocalDate returnDate,
+            LocalTime earliestOutboundDeparture, LocalTime latestOutboundDeparture,
+            LocalTime earliestReturnArrival, LocalTime latestReturnArrival,
+            BigDecimal maxTransportBudget, String currency, Set<TransportType> transportTypes,
+            boolean directOnly) {
+        this(origin, outboundDate, returnDate, earliestOutboundDeparture, latestOutboundDeparture,
+                earliestReturnArrival, latestReturnArrival, maxTransportBudget, currency,
+                transportTypes, directOnly, Set.of());
+    }
 }

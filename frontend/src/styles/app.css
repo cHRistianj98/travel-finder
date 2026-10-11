@@ -168,8 +168,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .detail-line { display: flex; justify-content: space-between; gap: 8px; font-size: 10px; padding: 7px 0; }
 .detail-line span { color: #7f9082; }
 .detail-line strong { text-align: right; color: #314d3c; font-size: 10px; }
-.demo-detail-note { display: flex; align-items: flex-start; gap: 6px; background: #f1f5ed; border-radius: 9px; padding: 10px; margin-top: 8px; line-height: 1.5; color: #6b816d; font-size: 10px; }
-.demo-detail-note svg { flex-shrink: 0; }
+.live-detail-note { display: flex; align-items: flex-start; gap: 6px; background: #f1f5ed; border-radius: 9px; padding: 10px; margin-top: 8px; line-height: 1.5; color: #6b816d; font-size: 10px; }
+.live-detail-note svg { flex-shrink: 0; }
 .detail-button { display: flex; justify-content: space-between; align-items: center; width: 100%; color: #315b45; background: transparent; border: 0; border-top: 1px solid #edf0ea; padding: 13px 0 2px; font-size: 11px; font-weight: 800; transition: color .2s; }
 .detail-button:hover { color: #77a455; }
 .detail-button svg { transition: transform .2s; }
@@ -392,3 +392,47 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
   border: 1px solid rgba(255,255,255,.65);
   box-shadow: 0 4px 16px rgba(8,25,16,.10);
 }
+
+
+/* Live flights only — jasny komunikat o trybie testowym i niedostępnych providerach */
+.flight-search-helper { color: #839187; font-size: 11px; line-height: 1.55; margin: 9px 1px 0; }
+.flight-test-hint { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; background: #f3f8ed; border: 1px solid #e0e9d8; border-radius: 12px; padding: 12px; margin: 16px 0; }
+.flight-test-hint span { display: inline-flex; align-items: center; gap: 6px; color: #62775f; font-size: 11px; font-weight: 700; }
+.flight-wide-button { background: white; border: 1px solid #c9dac0; border-radius: 9px; color: #2b5a42; padding: 9px 12px; font-weight: 800; font-size: 11px; cursor: pointer; }
+.flight-wide-button:hover { background: #e5f1d9; }
+.transport-choice.coming-soon { opacity: .56; cursor: not-allowed; }
+.transport-choice.coming-soon:hover { transform: none; border-color: #e4eae2; }
+.transport-choice:disabled:not(.coming-soon) { cursor: default; opacity: 1; }
+.transport-choice:disabled:not(.coming-soon):hover { transform: none; }
+
+/* Flexible availability, not fixed departure / return days */
+.availability-hint { display: flex; align-items: center; gap: 9px; border-radius: 10px; margin: 9px 0 0; padding: 10px 12px; background: #edf5e7; color: #406449; font-size: 11px; font-weight: 800; line-height: 1.45; }
+.availability-hint svg { flex: 0 0 auto; }
+.flight-search-helper { margin-bottom: 0; }
+
+.availability-cost-note { margin: 9px 2px 0; color: #8a9b8e; font-size: 10px; line-height: 1.5; }
+
+/* Travelpayouts cache: czytelny link do weryfikacji ceny, bez losowych zdjęć */
+.trip-cover-placeholder { height: 100%; width: 100%; display: grid; place-items: center; color: rgba(255,255,255,.40); background: radial-gradient(ellipse at 72% 26%, #8aaa9d 0%, #4d7b73 48%, #244b4d 100%); }
+.trip-booking-link { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-radius: 11px; background: #345d48; color: #fff; text-decoration: none; padding: 13px 14px; font-size: 11px; font-weight: 800; margin: 0 0 12px; transition: background .18s, transform .18s; }
+.trip-booking-link:hover { background: #244935; transform: translateY(-1px); color: white; }
+.trip-booking-link:focus-visible { outline: 3px solid #8aba82; outline-offset: 2px; }
+
+/* Kalendarz wielu nieciągłych okresów urlopu — Travelpayouts filtruje wyniki lokalnie. */
+.availability-popover { width: min(414px, calc(100vw - 54px)); padding: 19px; }
+.availability-popover .travel-months { justify-content: center; }
+.availability-popover .travel-month { width: 100%; }
+.availability-popover .travel-daypicker { --rdp-day-width: 39px; --rdp-day-height: 39px; --rdp-day_button-width: 39px; --rdp-day_button-height: 39px; }
+.availability-popover .travel-day-button { width: 39px; height: 39px; border-radius: 11px; }
+.availability-presets { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 16px; }
+.availability-presets button { font-family: inherit; background: #eff5e8; border: 1px solid #d8e7d2; border-radius: 9px; color: #345e46; padding: 9px 11px; font-size: 11px; font-weight: 800; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
+.availability-presets button:hover { background: #e0eed7; border-color: #aeca9e; }
+.availability-presets button:last-child { background: #fafbf8; color: #819187; border-color: #e5ebe3; }
+.availability-month-note { margin: 10px 2px 0; color: #87968b; font-size: 10px; line-height: 1.5; }
+.availability-month-note strong { color: #536e5b; text-transform: capitalize; }
+.availability-calendar-summary { display: flex; gap: 9px; justify-content: space-around; border-radius: 11px; background: #f0f6e9; margin-top: 14px; padding: 12px; color: #496c50; font-size: 11px; font-weight: 700; }
+.availability-calendar-summary strong { font-size: 15px; color: #254634; }
+.availability-calendar-warning { color: #a85a37; font-size: 11px; line-height: 1.5; padding: 10px 11px; border-radius: 9px; background: #fff3e9; margin: 9px 0 0; }
+.availability-popover .travel-day-disabled .travel-day-button { color: #b7c4b9; opacity: .4; cursor: not-allowed; }
+@media (max-width: 620px) { .availability-popover { left: -1px; right: auto; padding: 12px; } .availability-popover .travel-day-button { width: 36px; height: 36px; } }
+.availability-field .date-range-text { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

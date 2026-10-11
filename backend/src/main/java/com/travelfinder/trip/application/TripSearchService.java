@@ -1,30 +1,29 @@
 package com.travelfinder.trip.application;
 
+import com.travelfinder.trip.domain.TransportType;
 import com.travelfinder.trip.domain.TripOption;
 import com.travelfinder.trip.domain.TripSearchRequest;
-import com.travelfinder.trip.mock.MockTripData;
+import com.travelfinder.trip.domain.AvailabilityCalendar;
 import com.travelfinder.trip.flight.FlightSearchProvider;
-import com.travelfinder.trip.domain.TransportType;
 import com.travelfinder.trip.flight.OriginAirports;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/**
+ * Wyniki tylko od aktywnego providera; domyślnie cache Travelpayouts.
+ * Pociąg/autobus/samochód pozostają nieaktywne, dopóki nie dodamy prawdziwych providerów.
+ */
 @Service
 public class TripSearchService {
-
-    private final MockTripData mockTripData;
     private final FlightSearchProvider flightProvider;
 
-    public TripSearchService(MockTripData mockTripData, FlightSearchProvider flightProvider) {
-        this.mockTripData = mockTripData;
+    public TripSearchService(FlightSearchProvider flightProvider) {
         this.flightProvider = flightProvider;
     }
 
     public List<TripOption> search(TripSearchRequest request) {
-        if (!request.returnDate().isAfter(request.outboundDate())) {
-            throw new IllegalArgumentException("Data powrotu musi być późniejsza niż data wyjazdu.");
-        }
+        AvailabilityCalendar availability = AvailabilityCalendar.from(request);
         if (!"PLN".equalsIgnoreCase(request.currency())) {
             throw new IllegalArgumentException("Na razie obsługujemy tylko walutę PLN.");
         }
@@ -34,22 +33,20 @@ public class TripSearchService {
         if (request.earliestReturnArrival().isAfter(request.latestReturnArrival())) {
             throw new IllegalArgumentException("Zakres godzin powrotu jest niepoprawny.");
         }
-
-        List<TripOption> candidates = new java.util.ArrayList<>();
-        if (request.transportTypes().contains(TransportType.FLIGHT)) {
-            // Przykład: Białystok nie ma obsługiwanego lotniska, ale autobus/auto nadal działa.
-            if (OriginAirports.airportFor(request.origin()).isPresent()) {
-                candidates.addAll(flightProvider.search(request));
-            } else if (request.transportTypes().size() == 1) {
-                throw new IllegalArgumentException("Dla tego miasta nie mamy jeszcze lotniska w wyszukiwarce lotów.");
-            }
+        if (!request.transportTypes().contains(TransportType.FLIGHT)) {
+            throw new IllegalArgumentException("Na razie dostępne jest tylko wyszukiwanie prawdziwych lotów. Pociągi, autobusy i samochody dodamy później.");
         }
-        // Pozostałe środki transportu zachowują demonstracyjne mocki.
-        candidates.addAll(mockTripData.forDates(request).stream()
-                .filter(option -> option.transportType() != TransportType.FLIGHT)
-                .toList());
-        return candidates.stream()
-                .filter(option -> request.transportTypes().contains(option.transportType()))
+        if (OriginAirports.airportFor(request.origin()).isEmpty()) {
+            throw new IllegalArgumentException("Nie mamy jeszcze obsługiwanego lotniska dla miasta: " + request.origin());
+        }
+
+        // Żadnego mockowania ani fallbacku do przykładowych podróży.
+        // Brak oferty = pusta lista, błąd dostawcy = wyjątek.
+        return flightProvider.search(request).stream()
+                .filter(option -> option.transportType() == TransportType.FLIGHT)
+                .filter(option -> availability.allowsTrip(option.outboundDeparture().toLocalDate(),
+                        option.returnArrival().toLocalDate()))
+                .filter(option -> !option.returnArrival().toInstant().isBefore(option.outboundArrival().toInstant()))
                 .filter(option -> option.price().compareTo(request.maxTransportBudget()) <= 0)
                 .filter(option -> !request.directOnly()
                         || (option.outboundTransfers() == 0 && option.returnTransfers() == 0))

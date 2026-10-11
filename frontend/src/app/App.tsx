@@ -16,7 +16,7 @@ export default function App() {
           </nav>
           <div className="nav-aside">
             <span className="live-dot" />
-            <span>Wersja demonstracyjna</span>
+            <span>Wyszukiwanie przez API</span>
             <span className="version-tag">01</span>
           </div>
         </div>
@@ -29,8 +29,8 @@ export default function App() {
             <h1 id="hero-title">Masz wolny weekend?<br /><em>Świat stoi otworem.</em></h1>
             <p>Ty wybierasz <strong>kiedy</strong> i <strong>za ile</strong>. My pokazujemy, <strong>dokąd warto pojechać</strong>. Bez wpisywania celu podróży.</p>
             <div className="hero-bullets">
-              <span><Icon name="check" size={14} /> Z dowolnym kierunkiem</span>
-              <span><Icon name="check" size={14} /> Wszystkie środki transportu</span>
+              <span><Icon name="check" size={14} /> Kierunki bez wpisywania celu</span>
+              <span><Icon name="check" size={14} /> Na razie prawdziwe loty</span>
             </div>
           </div>
 
@@ -55,7 +55,7 @@ export default function App() {
           <div className="how-top"><h2>Od wolnego piątku do <em>nowego miejsca.</em></h2><p>Bez setek zakładek, porównywarek i ręcznego szukania kierunków.</p></div>
           <div className="how-grid">
             <article className="how-item"><span className="how-icon"><Icon name="calendar" size={22} /></span><span className="how-number">01 / TERMIN</span><h3>Wpisz, kiedy możesz</h3><p>Wybierz miasto, daty, godziny oraz budżet.</p></article>
-            <article className="how-item"><span className="how-icon"><Icon name="route" size={22} /></span><span className="how-number">02 / MOŻLIWOŚCI</span><h3>Sprawdź różne kierunki</h3><p>Zobacz podróże samolotem, pociągiem, autobusem lub autem.</p></article>
+            <article className="how-item"><span className="how-icon"><Icon name="route" size={22} /></span><span className="how-number">02 / MOŻLIWOŚCI</span><h3>Sprawdź różne kierunki</h3><p>Na razie porównuj loty; pozostałe środki transportu dodamy po integracji z dostawcami.</p></article>
             <article className="how-item"><span className="how-icon"><Icon name="sparkles" size={22} /></span><span className="how-number">03 / DECYZJA</span><h3>Wybierz swój weekend</h3><p>Porównaj czas na miejscu, godziny i cenę transportu.</p></article>
           </div>
         </section>
