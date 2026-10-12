@@ -50,3 +50,15 @@ export function flixBusDateSummary(
     `Powrót: ${returnDeparture.slice(0, 10)} o ${returnDeparture.slice(11, 16)}\n` +
     'Sprawdź kurs oraz ostateczną cenę u przewoźnika.';
 }
+
+/**
+ * Backend w chwili kliknięcia rozpoznaje miasta i przekierowuje na wyniki
+ * FlixBusa dla dokładnej daty. Nie zależy to od ładowania podglądu ceny.
+ * Godzina GTFS nie jest parametrem sklepu — po otwarciu wyników trzeba
+ * potwierdzić odpowiedni kurs i przystanek.
+ */
+export function flixBusSearchLink(from: string, to: string, departure: string): string {
+  const date = departure.slice(0, 10);
+  const params = new URLSearchParams({ from, to, date });
+  return `/api/trips/bus/search-link?${params.toString()}`;
+}

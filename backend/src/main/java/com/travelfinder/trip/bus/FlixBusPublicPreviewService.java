@@ -92,7 +92,28 @@ public class FlixBusPublicPreviewService {
                 prefilled, total != null ? "PUBLIC_ROUTE_MINIMUM" : "UNAVAILABLE", clock.instant());
     }
 
-    private String shop(String originId, String destinationId, LocalDate date) {
+    /**
+     * Link otwierany bezpośrednio po kliknięciu w kartę. Nie czeka na dane cenowe:
+     * próbujemy rozpoznać oba ID miasta (z cache), a jeśli to niemożliwe,
+     * wracamy do publicznej strony relacji. Nigdy nie przekazujemy zewnętrznego URL od klienta.
+     */
+    public String searchLink(String from, String to, LocalDate departureDate) {
+        if (from == null || to == null || from.isBlank() || to.isBlank()
+                || from.length() > 120 || to.length() > 120 || departureDate == null) {
+            throw new IllegalArgumentException("Niepoprawna relacja lub data FlixBus.");
+        }
+        String fromId = cityId(normalizedCity(from));
+        String toId = cityId(normalizedCity(to));
+        if (fromId == null || toId == null) return FlixBusBookingLinks.route(from, to);
+        return shop(fromId, toId, departureDate);
+    }
+
+    // package-private: pozwala testować odwrócenie kierunku i datę bez zewnętrznych żądań.
+    static String shop(String originId, String destinationId, LocalDate date) {
+        if (!originId.matches("[0-9a-fA-F-]{32,36}|[0-9]{1,12}")
+                || !destinationId.matches("[0-9a-fA-F-]{32,36}|[0-9]{1,12}")) {
+            throw new IllegalArgumentException("Niepoprawny identyfikator miasta FlixBus.");
+        }
         return "https://shop.flixbus.com/search?departureCity=" + originId
                 + "&arrivalCity=" + destinationId
                 + "&rideDate=" + SHOP_DATE.format(date)
@@ -178,7 +199,7 @@ public class FlixBusPublicPreviewService {
         for (JsonNode city : root) {
             String found = normalizedCity(city.path("name").asText(""));
             String id = city.path("id").asText("");
-            if (found.equals(wanted) && id.matches("[0-9a-fA-F-]{32,36}")) return id;
+            if (found.equals(wanted) && id.matches("[0-9a-fA-F-]{32,36}|[0-9]{1,12}")) return id;
         }
         return null;
     }

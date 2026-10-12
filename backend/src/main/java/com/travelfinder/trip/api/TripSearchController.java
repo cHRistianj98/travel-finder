@@ -3,6 +3,9 @@ package com.travelfinder.trip.api;
 import com.travelfinder.trip.application.TripSearchService;
 import com.travelfinder.trip.bus.FlixBusPublicPreviewService;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import java.net.URI;
 import java.time.LocalDate;
 import com.travelfinder.trip.domain.TripOption;
 import com.travelfinder.trip.domain.TripSearchRequest;
@@ -40,6 +43,15 @@ public class TripSearchController {
             @RequestParam String from, @RequestParam String to,
             @RequestParam LocalDate departureDate, @RequestParam LocalDate returnDate) {
         return busPreviewService.preview(from, to, departureDate, returnDate);
+    }
+
+    /** Jednoklikowe wyszukiwanie wybranego dnia: tam i powrót to osobne linki. */
+    @GetMapping("/bus/search-link")
+    public ResponseEntity<Void> busSearchLink(
+            @RequestParam String from, @RequestParam String to, @RequestParam LocalDate date) {
+        String destination = busPreviewService.searchLink(from, to, date);
+        // URL pochodzi tylko z dwóch zaufanych generatorów (flixbus.com), a nie z requestu.
+        return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(destination)).build();
     }
 
     @PostMapping("/search")

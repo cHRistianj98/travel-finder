@@ -484,3 +484,17 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 /* Minimalna cena publiczna FlixBusa — bez sugerowania ceny konkretnego kursu. */
 .trip-price-row .bus-indicative-price { color: #236b44; }
 .trip-price-row small { white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
+
+/* FlixBus: dwa niezależne, zawsze widoczne linki do wyszukiwania konkretnej daty. */
+.bus-search-actions { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; margin: 12px 0 13px; }
+.bus-search-action { min-width: 0; display: flex; flex-direction: column; gap: 6px; text-decoration: none; padding: 12px; border-radius: 12px; background: #315a43; border: 1px solid #315a43; color: #fff; transition: transform .18s ease, background .18s ease, border-color .18s ease; }
+.bus-search-action:hover { color: #fff; background: #244a37; border-color: #244a37; transform: translateY(-2px); }
+.bus-search-action:focus-visible { outline: 3px solid #a0c68d; outline-offset: 2px; }
+.bus-search-action-return { background: #ecf4e9; border-color: #cbdcc8; color: #27523c; }
+.bus-search-action-return:hover { color: #214a33; background: #dfeedd; border-color: #96be9c; }
+.bus-search-action-label { display: flex; align-items: center; gap: 5px; font-size: 9px; font-weight: 900; letter-spacing: .2px; }
+.bus-search-action-label svg:last-child { margin-left: auto; flex: 0 0 auto; }
+.bus-search-action strong { display: block; font-size: 11px; line-height: 1.35; overflow-wrap: anywhere; }
+.bus-search-action-time { font-size: 10px; opacity: .85; font-weight: 650; }
+.bus-search-action-note { grid-column: 1 / -1; font-size: 10px; color: #7d8c81; margin: 0 2px; line-height: 1.45; }
+@media (max-width: 390px) { .bus-search-actions { grid-template-columns: 1fr; } }
