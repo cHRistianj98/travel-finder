@@ -18,4 +18,6 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
-.env.local.example
+
+# Bulk GTFS timetables (downloaded on first bus search)
+backend/.cache/

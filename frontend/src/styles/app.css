@@ -300,6 +300,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .trip-cover-content small { display: block; margin-bottom: 6px; color: rgba(255,255,255,.84); font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; }
 .trip-cover-content h3 { margin: 0 0 5px; font-size: 29px; letter-spacing: -.8px; color: #fff; text-shadow: 0 2px 15px rgba(23, 35, 23, .42); }
 .trip-cover-content p { margin: 0; color: rgba(255,255,255,.88); font-size: 11px; }
+.trip-landmark-badge { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 7px 11px; border-radius: 999px; background: rgba(12, 22, 18, .36); border: 1px solid rgba(255,255,255,.18); color: rgba(255,255,255,.92); font-size: 10px; font-weight: 800; backdrop-filter: blur(8px); max-width: 100%; }
+.trip-landmark-badge svg { flex: 0 0 auto; }
 .trip-badge { color: #fff; font-size: 10px; font-weight: 800; padding: 7px 10px; border-radius: 999px; background: rgba(19, 28, 23, .34); backdrop-filter: blur(8px); }
 .trip-card-body { padding: 15px 16px 12px; }
 .trip-price-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; margin-bottom: 16px; }
@@ -417,6 +419,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 
 /* Travelpayouts cache: czytelny link do weryfikacji ceny, bez losowych zdjęć */
 .trip-cover-placeholder { height: 100%; width: 100%; display: grid; place-items: center; color: rgba(255,255,255,.40); background: radial-gradient(ellipse at 72% 26%, #8aaa9d 0%, #4d7b73 48%, #244b4d 100%); }
+.trip-cover img { background: linear-gradient(135deg, #17362e, #3e705e); }
 .trip-booking-link { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-radius: 11px; background: #345d48; color: #fff; text-decoration: none; padding: 13px 14px; font-size: 11px; font-weight: 800; margin: 0 0 12px; transition: background .18s, transform .18s; }
 .trip-booking-link:hover { background: #244935; transform: translateY(-1px); color: white; }
 .trip-booking-link:focus-visible { outline: 3px solid #8aba82; outline-offset: 2px; }

@@ -25,7 +25,8 @@ public class TripSearchController {
     /** Publiczny status funkcji bez udostępniania klucza API ani kontaktu z PLK. */
     @GetMapping("/providers")
     public java.util.Map<String, Boolean> providers() {
-        return java.util.Map.of("trainAvailable", service.isTrainAvailable());
+        return java.util.Map.of("trainAvailable", service.isTrainAvailable(),
+                "busAvailable", service.isBusAvailable());
     }
 
     @PostMapping("/search")

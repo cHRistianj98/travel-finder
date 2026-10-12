@@ -1,3 +1,5 @@
+import { resolveDestinationMeta } from './destinationVisuals';
+
 export type TransportType = 'FLIGHT' | 'TRAIN' | 'BUS' | 'CAR';
 
 export interface TripSearchRequest {
@@ -35,6 +37,14 @@ export interface TripOption {
   bookingUrl: string | null;
 }
 
+export interface DestinationMeta {
+  subtitle: string;
+  country: string;
+  image: string;
+  palette: string;
+  landmark: string;
+}
+
 export const TRANSPORT_LABELS: Record<TransportType, string> = {
   FLIGHT: 'Samolot',
   TRAIN: 'Pociąg',
@@ -42,37 +52,49 @@ export const TRANSPORT_LABELS: Record<TransportType, string> = {
   CAR: 'Samochód',
 };
 
-export const DESTINATION_META: Record<string, {
-  subtitle: string;
-  country: string;
-  image: string;
-  palette: string;
-}> = {
-  Rzym: {
-    subtitle: 'Historia na każdym rogu', country: 'Włochy', palette: 'orange',
-    image: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&w=1100&q=85',
-  },
-  Praga: {
-    subtitle: 'Magia starych uliczek', country: 'Czechy', palette: 'rose',
-    image: 'https://images.unsplash.com/photo-1519677100203-a0e668c92439?auto=format&fit=crop&w=1100&q=85',
-  },
-  Berlin: {
-    subtitle: 'Miasto, które nie zasypia', country: 'Niemcy', palette: 'blue',
-    image: 'https://images.unsplash.com/photo-1560969184-10fe8719e047?auto=format&fit=crop&w=1100&q=85',
-  },
-  Karpacz: {
-    subtitle: 'Weekend bliżej natury', country: 'Polska', palette: 'green',
-    image: 'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=1100&q=85',
-  },
-  Mediolan: {
-    subtitle: 'Włoskie dolce vita', country: 'Włochy', palette: 'lilac',
-    image: '', // Nie pokazujemy zdjęcia innego miasta jako Mediolanu
-  },
-  Drezno: {
-    subtitle: 'Sztuka tuż za granicą', country: 'Niemcy', palette: 'sand',
-    image: 'https://images.unsplash.com/photo-1549421263-6064833b071b?auto=format&fit=crop&w=1100&q=85',
-  },
+/**
+ * Lokalna biblioteka wizualna pod najczęstsze kierunki z Wrocławia.
+ * Zamiast zależeć od zewnętrznych stocków generujemy lekkie ilustracje SVG
+ * z motywem znanego miejsca danego miasta.
+ */
+export const DESTINATION_META: Record<string, DestinationMeta> = {
+  Berlin: resolveDestinationMeta('Berlin'),
+  Drezno: resolveDestinationMeta('Drezno'),
+  Praga: resolveDestinationMeta('Praga'),
+  Wiedeń: resolveDestinationMeta('Wiedeń'),
+  Budapeszt: resolveDestinationMeta('Budapeszt'),
+  Bratysława: resolveDestinationMeta('Bratysława'),
+  Brno: resolveDestinationMeta('Brno'),
+  Londyn: resolveDestinationMeta('Londyn'),
+  Paryż: resolveDestinationMeta('Paryż'),
+  Rzym: resolveDestinationMeta('Rzym'),
+  Mediolan: resolveDestinationMeta('Mediolan'),
+  Barcelona: resolveDestinationMeta('Barcelona'),
+  Amsterdam: resolveDestinationMeta('Amsterdam'),
+  Kopenhaga: resolveDestinationMeta('Kopenhaga'),
+  Sztokholm: resolveDestinationMeta('Sztokholm'),
+  Oslo: resolveDestinationMeta('Oslo'),
+  Dublin: resolveDestinationMeta('Dublin'),
+  Malta: resolveDestinationMeta('Malta'),
+  Split: resolveDestinationMeta('Split'),
+  Zadar: resolveDestinationMeta('Zadar'),
+  Dubrownik: resolveDestinationMeta('Dubrownik'),
+  Sofia: resolveDestinationMeta('Sofia'),
+  Gdańsk: resolveDestinationMeta('Gdańsk'),
+  Kraków: resolveDestinationMeta('Kraków'),
+  Warszawa: resolveDestinationMeta('Warszawa'),
+  Poznań: resolveDestinationMeta('Poznań'),
+  Szczecin: resolveDestinationMeta('Szczecin'),
+  Wrocław: resolveDestinationMeta('Wrocław'),
+  Monachium: resolveDestinationMeta('Monachium'),
+  Frankfurt: resolveDestinationMeta('Frankfurt'),
 };
+
+export function formatPrice(amount: number, currency = 'PLN'): string {
+  return new Intl.NumberFormat('pl-PL', {
+    style: 'currency', currency, maximumFractionDigits: 0,
+  }).format(amount);
+}
 
 export const POLISH_CITIES = [
   'Wrocław',
@@ -101,12 +123,6 @@ export function nextWeekend(): { outboundDate: string; returnDate: string } {
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
   return { outboundDate: localISO(friday), returnDate: localISO(sunday) };
-}
-
-export function formatPrice(amount: number, currency = 'PLN'): string {
-  return new Intl.NumberFormat('pl-PL', {
-    style: 'currency', currency, maximumFractionDigits: 0,
-  }).format(amount);
 }
 
 export function formatDate(date: string): string {

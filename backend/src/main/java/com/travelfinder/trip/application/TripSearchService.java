@@ -7,6 +7,7 @@ import com.travelfinder.trip.domain.AvailabilityCalendar;
 import com.travelfinder.trip.flight.FlightSearchProvider;
 import com.travelfinder.trip.flight.OriginAirports;
 import com.travelfinder.trip.train.TrainSearchProvider;
+import com.travelfinder.trip.bus.BusSearchProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -15,22 +16,39 @@ import java.util.List;
 
 /**
  * Loty z cache Travelpayouts oraz bezpośrednie pociągi z rozkładu PKP PLK.
- * Żadnych mocków i żadnych wymyślonych cen; BUS/CAR pozostają nieaktywne.
+ * Żadnych mocków ani wymyślonych cen; BUS korzysta z rozkładu FlixBus GTFS.
  */
 @Service
 public class TripSearchService {
     private final FlightSearchProvider flightProvider;
     private final TrainSearchProvider trainProvider;
+    private final BusSearchProvider busProvider;
     private final boolean trainAvailable;
+    private final boolean busAvailable;
 
     @Autowired
     public TripSearchService(FlightSearchProvider flightProvider, TrainSearchProvider trainProvider,
+            BusSearchProvider busProvider,
             @Value("${plk.enabled:false}") boolean plkEnabled,
-            @Value("${plk.api-key:}") String plkApiKey) {
+            @Value("${plk.api-key:}") String plkApiKey,
+            @Value("${bus.enabled:true}") boolean busEnabled) {
         this.flightProvider = flightProvider;
         this.trainProvider = trainProvider;
+        this.busProvider = busProvider;
+        this.busAvailable = busEnabled && busProvider != null;
         this.trainAvailable = plkEnabled && trainProvider != null
                 && plkApiKey != null && !plkApiKey.isBlank() && !plkApiKey.startsWith("TU_WKLEJ_");
+    }
+
+    // Zachowujemy dotychczasowe konstruktory w testach.
+    public TripSearchService(FlightSearchProvider flightProvider, TrainSearchProvider trainProvider,
+            boolean plkEnabled, String plkApiKey) {
+        this(flightProvider, trainProvider, null, plkEnabled, plkApiKey, false);
+    }
+
+    public TripSearchService(FlightSearchProvider flightProvider, TrainSearchProvider trainProvider,
+            BusSearchProvider busProvider) {
+        this(flightProvider, trainProvider, busProvider, false, "", true);
     }
 
     // Konstruktory dla testów jednostkowych z fałszywym gatewayem (bez Springa).
@@ -46,6 +64,10 @@ public class TripSearchService {
         return trainAvailable;
     }
 
+    public boolean isBusAvailable() {
+        return busAvailable;
+    }
+
     public List<TripOption> search(TripSearchRequest request) {
         AvailabilityCalendar availability = AvailabilityCalendar.from(request);
         if (!"PLN".equalsIgnoreCase(request.currency())) {
@@ -59,15 +81,20 @@ public class TripSearchService {
         }
         boolean flight = request.transportTypes().contains(TransportType.FLIGHT);
         boolean train = request.transportTypes().contains(TransportType.TRAIN);
-        if (!flight && !train) {
-            throw new IllegalArgumentException("Wybierz samolot lub pociąg. Autobusy i samochody dołączą później.");
+        boolean bus = request.transportTypes().contains(TransportType.BUS);
+        if (!flight && !train && !bus) {
+            throw new IllegalArgumentException("Wybierz samolot, pociąg lub autobus. Samochody dołączą później.");
         }
         if (flight && OriginAirports.airportFor(request.origin()).isEmpty()) {
             throw new IllegalArgumentException("Nie mamy jeszcze obsługiwanego lotniska dla miasta: " + request.origin());
         }
-        if (train && !trainAvailable && !flight) {
+        if (train && !trainAvailable && !flight && !(bus && busAvailable)) {
             throw new IllegalArgumentException("Kolej: oczekiwanie na dostęp do danych PKP PLK. "
                     + "Klucz musi zostać aktywowany, a integracja włączona w konfiguracji.");
+        }
+
+        if (bus && !busAvailable && !flight && !(train && trainAvailable)) {
+            throw new IllegalArgumentException("Autobusy: źródło rozkładów GTFS jest wyłączone w konfiguracji.");
         }
 
         java.util.List<TripOption> options = new java.util.ArrayList<>();
@@ -75,8 +102,10 @@ public class TripSearchService {
                 .filter(option -> option.transportType() == TransportType.FLIGHT).toList());
         if (train && trainAvailable) options.addAll(trainProvider.search(request).stream()
                 .filter(option -> option.transportType() == TransportType.TRAIN).toList());
+        if (bus && busAvailable) options.addAll(busProvider.search(request).stream()
+                .filter(option -> option.transportType() == TransportType.BUS).toList());
 
-        // Bez cen pociągów z PLK nie odrzucamy ich według budżetu ani nie wymyślamy kwot.
+        // Bez cen pociągów i autobusów nie odrzucamy ich według budżetu ani nie wymyślamy kwot.
         return options.stream()
                 .filter(option -> availability.allowsTrip(option.outboundDeparture().toLocalDate(),
                         option.returnArrival().toLocalDate()))

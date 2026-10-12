@@ -13,7 +13,7 @@ import 'react-day-picker/style.css';
 const TRANSPORTS: { type: TransportType; icon: IconName; title: string; subtitle: string; accent: string }[] = [
   { type: 'FLIGHT', icon: 'plane', title: 'Samolot', subtitle: 'Szybko i daleko', accent: 'flight' },
   { type: 'TRAIN', icon: 'train', title: 'Pociąg', subtitle: 'Rozkład PKP PLK', accent: 'train' },
-  { type: 'BUS', icon: 'bus', title: 'Autobus', subtitle: 'Wkrótce', accent: 'bus' },
+  { type: 'BUS', icon: 'bus', title: 'Autobus', subtitle: 'FlixBus · rozkład GTFS', accent: 'bus' },
   { type: 'CAR', icon: 'car', title: 'Samochód', subtitle: 'Wkrótce', accent: 'car' },
 ];
 
@@ -24,9 +24,10 @@ interface Props {
   onSearch: (request: TripSearchRequest) => void;
   loading: boolean;
   trainAccess: 'checking' | 'pending' | 'active' | 'unavailable';
+  busAccess: boolean;
 }
 
-export function TripSearchForm({ onSearch, loading, trainAccess }: Props) {
+export function TripSearchForm({ onSearch, loading, trainAccess, busAccess }: Props) {
   const [form, setForm] = useState<TripSearchRequest>(() => ({
     origin: 'Wrocław',
     outboundDate: DEFAULT_WEEKEND.outboundDate,
@@ -138,7 +139,7 @@ export function TripSearchForm({ onSearch, loading, trainAccess }: Props) {
               ? `${freeDays} dni zaznaczonych · ${datePairs} ${datePairs === 1 ? 'możliwa para dat' : 'możliwych par dat'} podróży`
               : 'Zaznacz co najmniej dwa kolejne wolne dni.'}</span>
         </div>
-        <p className="availability-cost-note">Loty: orientacyjne ceny z cache Aviasales. {trainAccess === 'active' ? 'Kolej: planowe rozkłady PKP PLK bez cen biletów.' : 'Kolej: oczekiwanie na aktywację PKP PLK.'} Filtry działają lokalnie; SearchApi pozostaje wyłączone.</p>
+        <p className="availability-cost-note">Loty: orientacyjne ceny z cache Aviasales. {trainAccess === 'active' ? 'Kolej: planowe rozkłady PKP PLK bez cen biletów.' : 'Kolej: oczekiwanie na aktywację PKP PLK.'} Autobusy: planowy rozkład FlixBus GTFS bez cen. Filtry działają lokalnie; SearchApi pozostaje wyłączone.</p>
       </div>
 
       <div className="field-section divider-top">
@@ -213,7 +214,7 @@ export function TripSearchForm({ onSearch, loading, trainAccess }: Props) {
           <button type="button" className="flight-wide-button" onClick={setWideSearch}>Ustaw szerokie wyszukiwanie</button>
         </div>
         <label className="field-label" htmlFor="budget">Maksymalny budżet na transport</label>
-        {form.transportTypes.includes('TRAIN') && <p className="train-budget-hint"><Icon name="info" size={14} /> PLK nie podaje cen biletów — budżet będzie sprawdzany tylko dla lotów. Koszt pociągu sprawdzisz u przewoźnika.</p>}
+        {(form.transportTypes.includes('TRAIN') || form.transportTypes.includes('BUS')) && <p className="train-budget-hint"><Icon name="info" size={14} /> Rozkłady pociągów i autobusów nie zawierają cen — budżet dotyczy wyłącznie lotów. Koszt sprawdzisz u przewoźnika.</p>}
         <div className="input-shell budget-shell">
           <Icon name="wallet" size={19} />
           <input id="budget" type="number" min="1" step="1" value={form.maxTransportBudget} onChange={e => update('maxTransportBudget', Number(e.target.value))} required />
@@ -230,19 +231,19 @@ export function TripSearchForm({ onSearch, loading, trainAccess }: Props) {
               <button
                 key={transport.type}
                 type="button"
-                className={`transport-choice transport-${transport.accent} ${selected ? 'selected' : ''} ${transport.type === 'BUS' || transport.type === 'CAR' ? 'coming-soon' : ''} ${transport.type === 'TRAIN' && trainAccess !== 'active' ? 'waiting-access' : ''}`}
+                className={`transport-choice transport-${transport.accent} ${selected ? 'selected' : ''} ${transport.type === 'CAR' || (transport.type === 'BUS' && !busAccess) ? 'coming-soon' : ''} ${transport.type === 'TRAIN' && trainAccess !== 'active' ? 'waiting-access' : ''}`}
                 aria-pressed={selected}
-                disabled={transport.type === 'BUS' || transport.type === 'CAR' || (transport.type === 'TRAIN' && trainAccess !== 'active')}
+                disabled={transport.type === 'CAR' || (transport.type === 'BUS' && !busAccess) || (transport.type === 'TRAIN' && trainAccess !== 'active')}
                 onClick={() => update('transportTypes', selected
                   ? form.transportTypes.filter(mode => mode !== transport.type)
                   : [...form.transportTypes, transport.type])}
                 title={transport.type === 'TRAIN' ? (trainAccess === 'active' ? 'Planowane rozkłady PKP PLK' : 'Oczekiwanie na aktywację dostępu PKP PLK') :
-                  transport.type === 'FLIGHT' ? 'Historyczne oferty lotnicze z Aviasales' : 'Ten transport dodamy później'}
+                  transport.type === 'BUS' ? (busAccess ? 'Planowane bezpośrednie kursy FlixBus, bez cen' : 'Źródło GTFS jest wyłączone') : transport.type === 'FLIGHT' ? 'Historyczne oferty lotnicze z Aviasales' : 'Ten transport dodamy później'}
               >
                 <span className="transport-icon"><Icon name={transport.icon} size={20} /></span>
                 <span className="transport-name"><strong>{transport.title}</strong><small>{transport.type === 'TRAIN' && trainAccess !== 'active'
                   ? trainAccess === 'checking' ? 'Sprawdzam status…' : 'Oczekiwanie na dostęp'
-                  : transport.subtitle}</small></span>
+                  : transport.type === 'BUS' && !busAccess ? 'Niedostępne' : transport.subtitle}</small></span>
                 <span className="transport-checkbox">{selected && <Icon name="check" size={11} strokeWidth={3} />}</span>
               </button>
             );
@@ -255,8 +256,8 @@ export function TripSearchForm({ onSearch, loading, trainAccess }: Props) {
             <p>{trainAccess === 'unavailable'
               ? 'Nie udało się sprawdzić statusu integracji. Uruchom backend i odśwież stronę.'
               : trainAccess === 'checking'
-                ? 'Sprawdzam konfigurację backendu. Wyszukiwanie lotów pozostaje dostępne.'
-                : 'Klucz API czeka na zatwierdzenie administratora (zwykle 3–5 dni roboczych). Do tego czasu możesz wyszukiwać loty.'}</p>
+                ? 'Sprawdzam konfigurację backendu. Wyszukiwanie lotów i autobusów pozostaje dostępne.'
+                : 'Klucz API czeka na zatwierdzenie administratora (zwykle 3–5 dni roboczych). Do tego czasu możesz wyszukiwać loty i autobusy.'}</p>
           </div>
         </div>}
         <div className="direct-row"><div className="direct-text"><strong>Tylko bezpośrednie</strong><span>Bez przesiadek po drodze</span></div><button type="button" role="switch" aria-label="Tylko połączenia bezpośrednie" aria-checked={form.directOnly} className={`switch ${form.directOnly ? 'on' : ''}`} onClick={() => update('directOnly', !form.directOnly)}><span /></button></div>
@@ -264,7 +265,7 @@ export function TripSearchForm({ onSearch, loading, trainAccess }: Props) {
 
       {validationError && <p className="form-error" role="alert"><Icon name="alert" size={16} />{validationError}</p>}
       <button className="submit-button" type="submit" disabled={loading}>{loading ? <><span className="button-spinner" />Szukam kierunków...</> : <><Icon name="search" size={20} /> Odkryj kierunki <Icon name="arrow-right" size={20} className="submit-arrow" /></>}</button>
-      <div className="form-disclaimer"><Icon name="info" size={14} /> Loty: orientacyjne ceny z cache Aviasales. {trainAccess === 'active' ? 'Pociągi: planowe rozkłady PKP PLK bez cen biletów.' : 'Pociągi: oczekiwanie na aktywację dostępu PKP PLK.'} Zawsze potwierdź rozkład, dostępność i cenę przed podróżą.</div>
+      <div className="form-disclaimer"><Icon name="info" size={14} /> Loty: orientacyjne ceny z cache Aviasales. {trainAccess === 'active' ? 'Pociągi: planowe rozkłady PKP PLK bez cen biletów.' : 'Pociągi: oczekiwanie na aktywację dostępu PKP PLK.'} Autobusy: rozkład FlixBus Europe GTFS, bez cen. Zawsze potwierdź rozkład, dostępność i cenę przed podróżą.</div>
     </form>
   );
 }

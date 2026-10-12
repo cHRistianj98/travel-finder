@@ -6,6 +6,7 @@ import type { TripOption, TripSearchRequest } from './types';
 
 export function TripSearchPage() {
   const [trainAccess, setTrainAccess] = useState<'checking' | 'pending' | 'active' | 'unavailable'>('checking');
+  const [busAccess, setBusAccess] = useState(false);
   const [results, setResults] = useState<TripOption[]>([]);
 
   useEffect(() => {
@@ -13,10 +14,10 @@ export function TripSearchPage() {
     fetch('/api/trips/providers', { signal: controller.signal })
       .then(response => {
         if (!response.ok) throw new Error('Status serwera niedostępny');
-        return response.json() as Promise<{ trainAvailable: boolean }>;
+        return response.json() as Promise<{ trainAvailable: boolean; busAvailable?: boolean }>;
       })
-      .then(providers => { if (!controller.signal.aborted) setTrainAccess(providers.trainAvailable ? 'active' : 'pending'); })
-      .catch(() => { if (!controller.signal.aborted) setTrainAccess('unavailable'); });
+      .then(providers => { if (!controller.signal.aborted) { setTrainAccess(providers.trainAvailable ? 'active' : 'pending'); setBusAccess(providers.busAvailable === true); } })
+      .catch(() => { if (!controller.signal.aborted) { setTrainAccess('unavailable'); setBusAccess(false); } });
     return () => controller.abort();
   }, []);
   const [status, setStatus] = useState<SearchStatus>('idle');
@@ -38,5 +39,5 @@ export function TripSearchPage() {
     }
   }
 
-  return <div className="discovery-background"><div className="container discovery-layout"><TripSearchForm onSearch={request => { void handleSearch(request); }} loading={status === 'loading'} trainAccess={trainAccess} /><TripResults status={status} results={results} error={error} searchedRequest={searchedRequest} trainAccess={trainAccess} onRetry={() => { if (searchedRequest) void handleSearch(searchedRequest); }} /></div></div>;
+  return <div className="discovery-background"><div className="container discovery-layout"><TripSearchForm onSearch={request => { void handleSearch(request); }} loading={status === 'loading'} trainAccess={trainAccess} busAccess={busAccess} /><TripResults status={status} results={results} error={error} searchedRequest={searchedRequest} trainAccess={trainAccess} busAccess={busAccess} onRetry={() => { if (searchedRequest) void handleSearch(searchedRequest); }} /></div></div>;
 }
