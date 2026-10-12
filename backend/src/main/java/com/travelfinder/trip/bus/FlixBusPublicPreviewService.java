@@ -41,6 +41,8 @@ public class FlixBusPublicPreviewService {
     private static final Pattern FROM_PRICE = Pattern.compile(
             "(?iu)\\bod\\s*([0-9][0-9\\s\\u00a0]*[,.][0-9]{2})\\s*zł");
     private static final DateTimeFormatter SHOP_DATE = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+    // Polska domena jest konieczna: FlixBus wiąże walutę z językiem strony.
+    private static final String POLISH_SHOP_SEARCH = "https://shop.flixbus.pl/search";
     private static final Duration FARE_TTL = Duration.ofHours(24);
     private static final Duration NEGATIVE_TTL = Duration.ofHours(1);
     private static final Duration CITY_TTL = Duration.ofDays(14);
@@ -114,7 +116,7 @@ public class FlixBusPublicPreviewService {
                 || !destinationId.matches("[0-9a-fA-F-]{32,36}|[0-9]{1,12}")) {
             throw new IllegalArgumentException("Niepoprawny identyfikator miasta FlixBus.");
         }
-        return "https://shop.flixbus.com/search?departureCity=" + originId
+        return POLISH_SHOP_SEARCH + "?departureCity=" + originId
                 + "&arrivalCity=" + destinationId
                 + "&rideDate=" + SHOP_DATE.format(date)
                 + "&adult=1&currency=PLN&_locale=pl";
