@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Icon, type IconName } from '../../components/Icon';
 import { resolveDestinationMeta } from './destinationVisuals';
 import {
-  DESTINATION_META,
   TRANSPORT_LABELS,
   durationLabel,
   formatDate,
@@ -29,7 +28,10 @@ const TRANSPORT_THEMES: Record<TransportType, string> = {
 
 export function TripResultCard({ trip, index }: { trip: TripOption; index: number }) {
   const [expanded, setExpanded] = useState(false);
-  const meta = useMemo(() => DESTINATION_META[trip.destination] ?? resolveDestinationMeta(trip.destination), [trip.destination]);
+  const meta = useMemo(
+    () => resolveDestinationMeta(trip.destination, trip.transportType),
+    [trip.destination, trip.transportType],
+  );
   const isTrain = trip.transportType === 'TRAIN';
   const isBus = trip.transportType === 'BUS';
   const isSchedule = isTrain || isBus;

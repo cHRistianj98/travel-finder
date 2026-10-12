@@ -79,11 +79,118 @@ const ALIASES: Array<[string, string]> = [
 
 function normalize(input: string): string {
   return input
+    .toLowerCase()
+    .replace(/ł/g, 'l')
+    .replace(/ß/g, 'ss')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
+}
+
+/**
+ * Loty mają osobną bibliotekę obrazów z wygenerowanych panoram AI.
+ * Wspólne miasta (np. Berlin, Paryż, Warszawa) nie nadpisują grafik autobusowych.
+ * Klucze poniżej odpowiadają nazwom plików /destinations/flights/<key>.webp.
+ */
+const FLIGHT_DESTINATIONS: Record<string, Place> = {
+  budapeszt: { displayName: 'Budapeszt', subtitle: 'Dunaj, mosty i wieczorne panoramy', country: 'Węgry', palette: 'rose', landmark: 'Parlament nad Dunajem' },
+  oslo: { displayName: 'Oslo', subtitle: 'Fiord, design i skandynawska architektura', country: 'Norwegia', palette: 'blue', landmark: 'Opera w Oslo' },
+  londyn: { displayName: 'Londyn', subtitle: 'Ikony miasta i spacery nad Tamizą', country: 'Wielka Brytania', palette: 'blue', landmark: 'Big Ben i Westminster' },
+  kiszyniow: { displayName: 'Kiszyniów', subtitle: 'Odkrywaj stolicę Mołdawii', country: 'Mołdawia', palette: 'sand', landmark: 'Łuk Triumfalny' },
+  paryz: { displayName: 'Paryż', subtitle: 'Spacer nad Sekwaną i paryskie bulwary', country: 'Francja', palette: 'rose', landmark: 'Wieża Eiffla' },
+  palermo: { displayName: 'Palermo', subtitle: 'Sycylińskie place i śródziemnomorski klimat', country: 'Włochy', palette: 'orange', landmark: 'Katedra w Palermo' },
+  malaga: { displayName: 'Malaga', subtitle: 'Słońce i andaluzyjskie uliczki', country: 'Hiszpania', palette: 'sand', landmark: 'Alcazaba i port w Maladze' },
+  mediolan: { displayName: 'Mediolan', subtitle: 'Kawiarnie, styl i włoska architektura', country: 'Włochy', palette: 'lilac', landmark: 'Katedra Duomo' },
+  barcelona: { displayName: 'Barcelona', subtitle: 'Architektura Gaudíego i śródziemnomorskie słońce', country: 'Hiszpania', palette: 'orange', landmark: 'Sagrada Família' },
+  dublin: { displayName: 'Dublin', subtitle: 'Kolorowe fasady i muzyka w pubach', country: 'Irlandia', palette: 'green', landmark: 'Most Ha’penny' },
+  alicante: { displayName: 'Alicante', subtitle: 'Hiszpańskie plaże i promenady', country: 'Hiszpania', palette: 'blue', landmark: 'Zamek Santa Bárbara' },
+  rzym: { displayName: 'Rzym', subtitle: 'Wieczne Miasto i antyczna historia', country: 'Włochy', palette: 'orange', landmark: 'Koloseum' },
+  warszawa: { displayName: 'Warszawa', subtitle: 'Starówka, Wisła i stołeczne życie', country: 'Polska', palette: 'rose', landmark: 'Plac Zamkowy' },
+  larnaka: { displayName: 'Larnaka', subtitle: 'Morze, palmy i cypryjskie spacery', country: 'Cypr', palette: 'blue', landmark: 'Promenada Finikoudes' },
+  bolonia: { displayName: 'Bolonia', subtitle: 'Portyki, renesans i włoska kuchnia', country: 'Włochy', palette: 'orange', landmark: 'Dwie Wieże' },
+  fuerteventura: { displayName: 'Fuerteventura', subtitle: 'Plaże, wydmy i oceaniczne przestrzenie', country: 'Hiszpania · Wyspy Kanaryjskie', palette: 'sand', landmark: 'Wydmy Corralejo' },
+  sztokholm: { displayName: 'Sztokholm', subtitle: 'Wyspy, kamienice i nordyckie światło', country: 'Szwecja', palette: 'blue', landmark: 'Gamla Stan' },
+  frankfurt: { displayName: 'Frankfurt', subtitle: 'Nowoczesna panorama i historyczne centrum', country: 'Niemcy', palette: 'blue', landmark: 'Römerberg i skyline' },
+  teneryfa: { displayName: 'Teneryfa', subtitle: 'Wulkan, ocean i wieczna wiosna', country: 'Hiszpania · Wyspy Kanaryjskie', palette: 'orange', landmark: 'Wulkan Teide' },
+  'gran-canaria': { displayName: 'Gran Canaria', subtitle: 'Plaże i wyspiarskie krajobrazy', country: 'Hiszpania · Wyspy Kanaryjskie', palette: 'sand', landmark: 'Las Palmas i Atlantyk' },
+  ateny: { displayName: 'Ateny', subtitle: 'Antyczne wzgórza i greckie uliczki', country: 'Grecja', palette: 'sand', landmark: 'Akropol' },
+  berlin: { displayName: 'Berlin', subtitle: 'Historia i nowoczesne miejskie życie', country: 'Niemcy', palette: 'blue', landmark: 'Brama Brandenburska' },
+  nicea: { displayName: 'Nicea', subtitle: 'Riwiera Francuska i lazurowe morze', country: 'Francja', palette: 'blue', landmark: 'Promenade des Anglais' },
+  belgrad: { displayName: 'Belgrad', subtitle: 'Nad Sawą i Dunajem', country: 'Serbia', palette: 'green', landmark: 'Twierdza Kalemegdan' },
+  marrakesz: { displayName: 'Marrakesz', subtitle: 'Kolory, targi i marokańskie ogrody', country: 'Maroko', palette: 'orange', landmark: 'Minaret Kutubijja' },
+  reykjavik: { displayName: 'Reykjavík', subtitle: 'Gejzery, ocean i islandzka stolica', country: 'Islandia', palette: 'blue', landmark: 'Kościół Hallgrímskirkja' },
+  suczawa: { displayName: 'Suczawa', subtitle: 'Bukowina i historyczne twierdze', country: 'Rumunia', palette: 'green', landmark: 'Twierdza tronowa' },
+  kutaisi: { displayName: 'Kutaisi', subtitle: 'Gruzja poza utartym szlakiem', country: 'Gruzja', palette: 'green', landmark: 'Katedra Bagrati' },
+  sewilla: { displayName: 'Sewilla', subtitle: 'Andaluzja, tapas i słoneczne place', country: 'Hiszpania', palette: 'orange', landmark: 'Plaza de España' },
+  walencja: { displayName: 'Walencja', subtitle: 'Morze i futurystyczna architektura', country: 'Hiszpania', palette: 'blue', landmark: 'Miasto Sztuki i Nauki' },
+  madryt: { displayName: 'Madryt', subtitle: 'Królewska stolica i hiszpańskie życie', country: 'Hiszpania', palette: 'orange', landmark: 'Plac Cibeles' },
+  oviedo: { displayName: 'Oviedo', subtitle: 'Zielona Asturia na północy Hiszpanii', country: 'Hiszpania', palette: 'green', landmark: 'Katedra w Oviedo' },
+  monachium: { displayName: 'Monachium', subtitle: 'Bawarskie tradycje i zabytkowe place', country: 'Niemcy', palette: 'sand', landmark: 'Marienplatz' },
+  antalya: { displayName: 'Antalya', subtitle: 'Turkusowe wybrzeże i śródziemnomorski klimat', country: 'Turcja', palette: 'blue', landmark: 'Stary port Kaleiçi' },
+  erywan: { displayName: 'Erywań', subtitle: 'Kaukaskie krajobrazy i architektura', country: 'Armenia', palette: 'rose', landmark: 'Plac Republiki' },
+  zurych: { displayName: 'Zurych', subtitle: 'Jezioro i szwajcarski miejski styl', country: 'Szwajcaria', palette: 'blue', landmark: 'Starówka nad Limmatem' },
+  baku: { displayName: 'Baku', subtitle: 'Caspian skyline i stare miasto', country: 'Azerbejdżan', palette: 'blue', landmark: 'Flame Towers' },
+  hurghada: { displayName: 'Hurghada', subtitle: 'Słońce i błękit Morza Czerwonego', country: 'Egipt', palette: 'blue', landmark: 'Marina w Hurghadzie' },
+  'szarm-el-szejk': { displayName: 'Szarm el-Szejk', subtitle: 'Rafy koralowe i złote plaże', country: 'Egipt', palette: 'blue', landmark: 'Wybrzeże Morza Czerwonego' },
+  korfu: { displayName: 'Korfu', subtitle: 'Zatoczki i greckie Stare Miasto', country: 'Grecja', palette: 'green', landmark: 'Stara Forteca Korfu' },
+  tbilisi: { displayName: 'Tbilisi', subtitle: 'Kolorowe domy i kaukaskie wzgórza', country: 'Gruzja', palette: 'rose', landmark: 'Twierdza Narikala' },
+  wroclaw: { displayName: 'Wrocław', subtitle: 'Mosty i zabytkowy rynek', country: 'Polska', palette: 'green', landmark: 'Wrocławski Rynek' },
+};
+
+/**
+ * Mapowanie kodów IATA / miast w różnych językach do panoram.
+ * RMO=Kiszyniów (Mołdawia), SCV=Suczawa, OVD=Asturia/Oviedo,
+ * FUE=Fuerteventura, a BAK oznacza miasto Baku.
+ */
+const FLIGHT_ALIASES: Record<string, string> = {
+  rmo: 'kiszyniow', chisinau: 'kiszyniow', 'chisinau airport': 'kiszyniow',
+  fue: 'fuerteventura',
+  tci: 'teneryfa', tfs: 'teneryfa', tfn: 'teneryfa', tenerife: 'teneryfa',
+  lpa: 'gran-canaria', 'las palmas': 'gran-canaria',
+  rak: 'marrakesz', marrakech: 'marrakesz', marrakesh: 'marrakesz',
+  scv: 'suczawa', suceava: 'suczawa',
+  ovd: 'oviedo', asturias: 'oviedo',
+  evn: 'erywan', yerevan: 'erywan',
+  zrh: 'zurych', zurich: 'zurych',
+  bak: 'baku', gyd: 'baku',
+  hrg: 'hurghada',
+  ssh: 'szarm-el-szejk', 'sharm el sheikh': 'szarm-el-szejk', 'sharm el sheik': 'szarm-el-szejk',
+  tbs: 'tbilisi',
+  kut: 'kutaisi',
+  rom: 'rzym',
+  lon: 'londyn', london: 'londyn',
+  par: 'paryz', paris: 'paryz',
+  mil: 'mediolan', milan: 'mediolan',
+  waw: 'warszawa', warsaw: 'warszawa',
+  ber: 'berlin',
+  sto: 'sztokholm', stockholm: 'sztokholm',
+  osl: 'oslo', trf: 'oslo',
+  agp: 'malaga', malaga: 'malaga',
+  blq: 'bolonia', bologna: 'bolonia',
+  vlc: 'walencja', valencia: 'walencja',
+  sevilla: 'sewilla', svq: 'sewilla',
+  ath: 'ateny', athens: 'ateny',
+  nce: 'nicea', nice: 'nicea',
+  cfu: 'korfu', corfu: 'korfu',
+  rey: 'reykjavik', rek: 'reykjavik', kef: 'reykjavik', reykjavik: 'reykjavik',
+  pmo: 'palermo', bcn: 'barcelona', dub: 'dublin',
+  alc: 'alicante', lca: 'larnaka', larnaca: 'larnaka',
+  beg: 'belgrad', belgrade: 'belgrad',
+  fra: 'frankfurt', muc: 'monachium', munich: 'monachium',
+  ayt: 'antalya', mad: 'madryt', madrid: 'madryt',
+  bud: 'budapeszt', budapest: 'budapeszt',
+  wro: 'wroclaw',
+};
+
+// Avoid matching airport suffixes too eagerly (e.g. "Frankfurt Hahn" can be a distinct airport).
+function findFlightKey(normalized: string): string | undefined {
+  const explicit = FLIGHT_ALIASES[normalized] ?? normalized.replaceAll(' ', '-');
+  if (FLIGHT_DESTINATIONS[explicit]) return explicit;
+  const names = Object.keys(FLIGHT_DESTINATIONS).map(key => [key.replaceAll('-', ' '), key] as const);
+  // Prefer longer city names over one-word prefixes to avoid accidental matches.
+  names.sort((a, b) => b[0].length - a[0].length);
+  return names.find(([city]) => normalized.startsWith(`${city} `))?.[1];
 }
 
 const UNKNOWN_DESTINATION: DestinationMeta = {
@@ -95,8 +202,24 @@ const UNKNOWN_DESTINATION: DestinationMeta = {
   image: '',
 };
 
-export function resolveDestinationMeta(rawDestination: string): DestinationMeta {
+/**
+ * Zwraca metadata miejsca dla karty. Domyślnie pozostaje stara biblioteka FlixBusa.
+ * Loty korzystają z oddzielnych fotografio-podobnych panoram AI.
+ */
+export function resolveDestinationMeta(
+  rawDestination: string,
+  transportType: 'FLIGHT' | 'TRAIN' | 'BUS' | 'CAR' = 'BUS',
+): DestinationMeta {
   const normalized = normalize(rawDestination);
+  if (transportType === 'FLIGHT') {
+    const flightKey = findFlightKey(normalized);
+    const flightPlace = flightKey ? FLIGHT_DESTINATIONS[flightKey] : undefined;
+    if (flightKey && flightPlace) {
+      return { ...flightPlace, image: `/destinations/flights/${flightKey}.webp` };
+    }
+  }
+
+  // Dotychczasowe zdjęcia autobusów/pociągów pozostają bez zmian.
   const alias = ALIASES.find(([prefix]) => normalized === prefix || normalized.startsWith(`${prefix} `));
   const key = alias?.[1];
   const place = key ? DESTINATIONS[key] : undefined;
