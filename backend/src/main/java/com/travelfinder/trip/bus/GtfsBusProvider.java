@@ -36,7 +36,6 @@ import java.util.zip.ZipFile;
 public class GtfsBusProvider implements BusSearchProvider {
     private static final Logger log = LoggerFactory.getLogger(GtfsBusProvider.class);
     private static final ZoneId DEFAULT_ZONE = ZoneId.of("Europe/Warsaw");
-    private static final String BOOKING = "https://www.flixbus.pl/";
     private static final DateTimeFormatter GTFS_DATE = DateTimeFormatter.BASIC_ISO_DATE;
     private static final List<String> ORIGINS = List.of("Wrocław", "Warszawa", "Kraków", "Gdańsk", "Poznań", "Łódź",
             "Katowice", "Szczecin", "Lublin", "Bydgoszcz", "Białystok", "Rzeszów");
@@ -45,21 +44,31 @@ public class GtfsBusProvider implements BusSearchProvider {
     private final TravelTimeZones timeZones;
     private final int maxTripDays;
     private final int maxResults;
+    private final FlixBusFareService fares;
     private final Map<String, ZoneId> zoneCache = new ConcurrentHashMap<>();
     private volatile Loaded loaded;
 
     @Autowired
     public GtfsBusProvider(GtfsArchiveGateway gateway, TravelTimeZones timeZones,
             @Value("${bus.max-trip-days:5}") int maxTripDays,
-            @Value("${bus.max-results:40}") int maxResults) {
+            @Value("${bus.max-results:40}") int maxResults, FlixBusFareService fares) {
         this.gateway = gateway;
         this.timeZones = timeZones;
         this.maxTripDays = Math.max(2, Math.min(14, maxTripDays));
         this.maxResults = Math.max(1, Math.min(200, maxResults));
+        this.fares = fares;
     }
 
     public GtfsBusProvider(GtfsArchiveGateway gateway) {
-        this(gateway, new TravelTimeZones(), 5, 40);
+        this(gateway, new TravelTimeZones(), 5, 40,
+                new FlixBusFareService(trip -> Optional.empty(), Duration.ofMinutes(30), Clock.systemUTC()));
+    }
+
+    // Zgodność z wcześniejszymi testami i lokalnymi wywołaniami providera.
+    public GtfsBusProvider(GtfsArchiveGateway gateway, TravelTimeZones timeZones,
+                           int maxTripDays, int maxResults) {
+        this(gateway, timeZones, maxTripDays, maxResults,
+                new FlixBusFareService(trip -> Optional.empty(), Duration.ofMinutes(30), Clock.systemUTC()));
     }
 
     @Override
@@ -125,14 +134,14 @@ public class GtfsBusProvider implements BusSearchProvider {
                 String key = go.id() + "::" + back.id();
                 TripOption option = new TripOption(UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8)),
                         request.origin(), go.city(), go.departure(), go.arrival(), back.departure(), back.arrival(),
-                        TransportType.BUS, null, "PLN", total, stay, 0, 0, "FLIXBUS_GTFS_TIMETABLE", BOOKING);
+                        TransportType.BUS, null, "PLN", total, stay, 0, 0, "FLIXBUS_GTFS_TIMETABLE", FlixBusBookingLinks.route(request.origin(), go.city()));
                 options.computeIfAbsent(normalize(go.city()), ignored -> new ArrayList<>()).add(option);
             }
         }
         Comparator<TripOption> ranking = Comparator.comparingLong(TripOption::timeAtDestinationMinutes).reversed()
                 .thenComparingLong(TripOption::totalTravelDurationMinutes).thenComparing(TripOption::outboundDeparture);
         return options.values().stream().flatMap(list -> list.stream().sorted(ranking).limit(2))
-                .sorted(ranking).limit(maxResults).toList();
+                .sorted(ranking).limit(maxResults).map(fares::enrich).toList();
     }
 
     private Gtfs snapshot() {

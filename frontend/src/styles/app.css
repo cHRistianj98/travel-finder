@@ -468,3 +468,15 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .trip-cover-content p { max-width: 90%; line-height: 1.4; }
 .trip-landmark-badge { max-width: 100%; margin-top: 8px; padding: 6px 10px; border: 1px solid rgba(255,255,255,.2); background: rgba(11,27,21,.48); text-shadow: none; line-height: 1.2; }
 @media (max-width: 620px) { .trip-cover { height: 215px; } }
+
+/* FlixBus: dwie daty, dwa kierunki oraz jawny brak automatycznego wybrania kursu. */
+.bus-check-panel { margin: 12px 0; padding: 12px; border: 1px solid #dbe7d8; border-radius: 11px; background: #f5f9f3; }
+.bus-check-heading { display: flex; align-items: center; gap: 7px; color: #27523c; font-size: 11px; font-weight: 800; margin-bottom: 10px; }
+.bus-check-leg { display: grid; gap: 4px; margin-bottom: 11px; font-size: 11px; }
+.bus-check-leg span { color: #66786b; font-weight: 650; }
+.bus-check-leg a { color: #244f39; text-decoration: none; font-weight: 800; display: inline-flex; align-items: center; gap: 5px; }
+.bus-check-leg a:hover { color: #55855f; text-decoration: underline; }
+.bus-check-copy { display: inline-flex; justify-content: center; align-items: center; gap: 6px; width: 100%; border-radius: 8px; border: 1px solid #c7d9c5; background: #fff; color: #28553e; font-size: 11px; font-weight: 800; padding: 9px; cursor: pointer; }
+.bus-check-copy:hover { background: #eaf3e7; }
+.bus-check-copy:focus-visible { outline: 3px solid #8aba82; outline-offset: 2px; }
+.bus-check-panel small { display: block; font-size: 10px; color: #718276; line-height: 1.5; margin-top: 8px; }

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Icon, type IconName } from '../../components/Icon';
 import { resolveDestinationMeta } from './destinationVisuals';
+import { flixBusRoutePage, flixBusDateSummary } from './flixBusBooking';
 import {
   TRANSPORT_LABELS,
   durationLabel,
@@ -28,6 +29,7 @@ const TRANSPORT_THEMES: Record<TransportType, string> = {
 
 export function TripResultCard({ trip, index }: { trip: TripOption; index: number }) {
   const [expanded, setExpanded] = useState(false);
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const meta = useMemo(
     () => resolveDestinationMeta(trip.destination, trip.transportType),
     [trip.destination, trip.transportType],
@@ -39,6 +41,16 @@ export function TripResultCard({ trip, index }: { trip: TripOption; index: numbe
   const allDirect = trip.outboundTransfers === 0 && trip.returnTransfers === 0;
   const themeClass = `transport-tone-${TRANSPORT_THEMES[trip.transportType]}`;
   const displayDestination = meta.displayName || trip.destination;
+  const busOutboundUrl = isBus ? flixBusRoutePage(trip.origin, trip.destination) : '';
+  const busReturnUrl = isBus ? flixBusRoutePage(trip.destination, trip.origin) : '';
+  const copyBusDates = async () => {
+    try {
+      await navigator.clipboard.writeText(flixBusDateSummary(trip.origin, displayDestination, trip.outboundDeparture, trip.returnDeparture));
+      setCopyState('copied');
+    } catch {
+      setCopyState('failed');
+    }
+  };
 
   return (
     <article className={`trip-card palette-${meta.palette} ${themeClass}`} style={{ animationDelay: `${index * 70}ms` }}>
@@ -72,7 +84,7 @@ export function TripResultCard({ trip, index }: { trip: TripOption; index: numbe
           <div>
             <span className="micro-label">{isSchedule ? 'Cena biletu' : 'Cena orientacyjna'}</span>
             <strong className={isSchedule ? 'train-unknown-price' : ''}>{trip.price === null ? 'Do sprawdzenia' : formatPrice(trip.price, trip.currency)}</strong>
-            <small>{isSchedule ? (isBus ? 'u FlixBusa · brak cen w GTFS' : 'u przewoźnika · brak ceny w PLK') : 'transport w obie strony'}</small>
+            <small>{isBus ? (trip.price === null ? 'Brak cen w GTFS · sprawdź u FlixBusa' : 'Cena partnerska za podróż w obie strony') : isTrain ? 'u przewoźnika · brak ceny w PLK' : 'transport w obie strony'}</small>
           </div>
         </div>
         <div className="trip-route">
@@ -109,9 +121,16 @@ export function TripResultCard({ trip, index }: { trip: TripOption; index: numbe
           {trip.destination !== displayDestination && <div className="detail-line"><span>Przystanek docelowy w źródle</span><strong>{trip.destination}</strong></div>}
           {meta.image && <div className="live-detail-note"><Icon name="info" size={14} /> Obraz na karcie jest fotorealistyczną wizualizacją AI inspirowaną miejscem, a nie dokumentalną fotografią.</div>}
           <div className="detail-line"><span>Przesiadki tam / powrót</span><strong>{trip.outboundTransfers} / {trip.returnTransfers}</strong></div>
+          {isBus && <div className="bus-check-panel">
+            <div className="bus-check-heading"><Icon name="ticket" size={15} /> Sprawdź obie ceny przed zakupem</div>
+            <div className="bus-check-leg"><span>Tam: {formatDate(trip.outboundDeparture)} o {formatTime(trip.outboundDeparture)}</span><a href={busOutboundUrl} target="_blank" rel="noopener noreferrer">{trip.origin} → {displayDestination} <Icon name="arrow-up-right" size={13} /></a></div>
+            <div className="bus-check-leg"><span>Powrót: {formatDate(trip.returnDeparture)} o {formatTime(trip.returnDeparture)}</span><a href={busReturnUrl} target="_blank" rel="noopener noreferrer">{displayDestination} → {trip.origin} <Icon name="arrow-up-right" size={13} /></a></div>
+            <button className="bus-check-copy" type="button" onClick={copyBusDates}><Icon name={copyState === 'copied' ? 'check' : 'calendar'} size={14} /> {copyState === 'copied' ? 'Daty i godziny skopiowane' : copyState === 'failed' ? 'Kopiowanie niedostępne' : 'Kopiuj daty i godziny'}</button>
+            <small>Strony relacji nie ustawiają automatycznie dat ani kursów. Po otwarciu FlixBusa wybierz podane daty i porównaj ceny obu przejazdów.</small>
+          </div>}
           <div className="live-detail-note"><Icon name="info" size={14} /> {isTrain ? 'Planowy rozkład PKP PLK, nie potwierdzona rezerwacja. API nie zawiera cen biletów. Sprawdź aktualny rozkład, taryfę i dostępność u przewoźnika.' : isBus ? 'Planowy rozkład FlixBus Europe GTFS (źródło: FlixBus France, licencja ODbL 1.0). Cena i dostępność miejsc nie są podane. Przed wyjazdem potwierdź kurs i cenę na stronie przewoźnika.' : 'Historyczna oferta znaleziona przez użytkowników Aviasales. Cena, dostępność i zasady bagażowe mogą się zmienić. Sprawdź ofertę przed zakupem.'}</div>
         </div>}
-        {trip.bookingUrl && <a className="trip-booking-link" href={trip.bookingUrl} target="_blank" rel="noopener noreferrer"><span>{isTrain ? 'Otwórz wyszukiwarkę PLK' : isBus ? 'Sprawdź kurs i cenę u FlixBusa' : 'Sprawdź aktualną cenę'}</span><Icon name="arrow-up-right" size={17} /></a>}
+        {trip.bookingUrl && <a className="trip-booking-link" href={trip.bookingUrl} target="_blank" rel="noopener noreferrer"><span>{isTrain ? 'Otwórz wyszukiwarkę PLK' : isBus ? 'Otwórz trasę we FlixBusie' : 'Sprawdź aktualną cenę'}</span><Icon name="arrow-up-right" size={17} /></a>}
         <button className="detail-button" type="button" onClick={() => setExpanded(!expanded)} aria-expanded={expanded} aria-controls={`details-${trip.id}`}><span>{expanded ? 'Ukryj szczegóły' : 'Zobacz szczegóły podróży'}</span><Icon name={expanded ? 'chevron-down' : 'arrow-up-right'} size={17} /></button>
       </div>
     </article>
