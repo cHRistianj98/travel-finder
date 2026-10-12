@@ -21,11 +21,26 @@ public final class FlixBusBookingLinks {
             Map.entry("lodz", "lodz"), Map.entry("warszawa", "warszawa"),
             Map.entry("katowice", "katowice"), Map.entry("drezno", "drezno"),
             Map.entry("dresden", "drezno"), Map.entry("wieden", "wieden"),
-            Map.entry("szklarska poreba", "szklarska-poreba")
+            Map.entry("szklarska poreba", "szklarska-poreba"),
+            Map.entry("jelenia gora", "jelenia-gora"),
+            Map.entry("zielona gora", "zielona-gora"),
+            Map.entry("gorzow wielkopolski", "gorzow-wielkopolski"),
+            Map.entry("swiebodzin", "swiebodzin"),
+            Map.entry("lubin", "lubin"),
+            Map.entry("szczecin", "szczecin"),
+            Map.entry("gliwice", "gliwice"),
+            Map.entry("chemnitz", "chemnitz"),
+            Map.entry("miedzyzdroje", "miedzyzdroje"),
+            Map.entry("harrachov", "harrachov"),
+            Map.entry("warsaw", "warszawa"),
+            Map.entry("vienna", "wieden")
     );
     private static final Set<String> KNOWN_WROCLAW_ROUTES = Set.of(
             "poznan", "berlin", "praga", "krakow", "lodz", "warszawa", "katowice",
-            "drezno", "wieden", "szklarska-poreba", "port-lotniczy-berlin");
+            "drezno", "wieden", "szklarska-poreba", "port-lotniczy-berlin",
+            "lubin", "jelenia-gora", "zielona-gora", "swiebodzin",
+            "gorzow-wielkopolski", "szczecin", "gliwice", "chemnitz",
+            "miedzyzdroje", "harrachov");
 
     private FlixBusBookingLinks() {}
 

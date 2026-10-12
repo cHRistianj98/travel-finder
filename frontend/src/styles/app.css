@@ -480,3 +480,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .bus-check-copy:hover { background: #eaf3e7; }
 .bus-check-copy:focus-visible { outline: 3px solid #8aba82; outline-offset: 2px; }
 .bus-check-panel small { display: block; font-size: 10px; color: #718276; line-height: 1.5; margin-top: 8px; }
+
+/* Minimalna cena publiczna FlixBusa — bez sugerowania ceny konkretnego kursu. */
+.trip-price-row .bus-indicative-price { color: #236b44; }
+.trip-price-row small { white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }

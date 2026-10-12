@@ -4,6 +4,9 @@
  * Nieznane trasy kierują na stronę główną, gdzie można wybrać miasta ręcznie.
  */
 const KNOWN_FROM_WROCLAW = new Set([
+  'lubin', 'jelenia-gora', 'zielona-gora', 'swiebodzin',
+  'gorzow-wielkopolski', 'szczecin', 'gliwice', 'chemnitz',
+  'miedzyzdroje', 'harrachov',
   'poznan', 'berlin', 'praga', 'krakow', 'lodz', 'warszawa',
   'katowice', 'drezno', 'wieden', 'szklarska-poreba', 'port-lotniczy-berlin',
 ]);
@@ -13,6 +16,10 @@ const KNOWN_SLUGS: Record<string, string> = {
   prague: 'praga', dresden: 'drezno', drezno: 'drezno',
   krakow: 'krakow', lodz: 'lodz', warszawa: 'warszawa',
   katowice: 'katowice', wieden: 'wieden',
+  lubin: 'lubin', 'jelenia gora': 'jelenia-gora', 'zielona gora': 'zielona-gora',
+  swiebodzin: 'swiebodzin', 'gorzow wielkopolski': 'gorzow-wielkopolski',
+  szczecin: 'szczecin', gliwice: 'gliwice', chemnitz: 'chemnitz',
+  miedzyzdroje: 'miedzyzdroje', harrachov: 'harrachov', warsaw: 'warszawa',
 };
 
 function slug(value: string): string {
