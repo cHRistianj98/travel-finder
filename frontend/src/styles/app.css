@@ -458,3 +458,13 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .plk-waiting-icon { display: grid; place-items: center; flex: 0 0 32px; width: 32px; height: 32px; border-radius: 9px; background: #f1ecd4; color: #85774a; }
 .plk-waiting-notice strong { display: block; color: #4f5142; font-size: 11px; line-height: 1.45; }
 .plk-waiting-notice p { margin: 4px 0 0; font-size: 10px; line-height: 1.55; }
+
+/* Fotorealistyczne panoramy kierunków: lokalne obrazy WebP, bez zewnętrznego CDN. */
+.trip-cover { height: 214px; background: linear-gradient(135deg, #17362e 0%, #507561 100%); }
+.trip-cover img { width: 100%; height: 100%; object-fit: cover; object-position: center 53%; filter: saturate(1.04); }
+.trip-cover-overlay { background: linear-gradient(180deg, rgba(9,30,21,.25) 0%, rgba(9,28,21,.00) 38%, rgba(8,24,19,.82) 100%); }
+.trip-cover-content { left: 17px; right: 17px; bottom: 15px; }
+.trip-cover-content h3 { margin-bottom: 3px; font-size: clamp(23px, 2.1vw, 29px); }
+.trip-cover-content p { max-width: 90%; line-height: 1.4; }
+.trip-landmark-badge { max-width: 100%; margin-top: 8px; padding: 6px 10px; border: 1px solid rgba(255,255,255,.2); background: rgba(11,27,21,.48); text-shadow: none; line-height: 1.2; }
+@media (max-width: 620px) { .trip-cover { height: 215px; } }

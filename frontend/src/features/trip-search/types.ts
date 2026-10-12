@@ -38,6 +38,7 @@ export interface TripOption {
 }
 
 export interface DestinationMeta {
+  displayName: string;
   subtitle: string;
   country: string;
   image: string;

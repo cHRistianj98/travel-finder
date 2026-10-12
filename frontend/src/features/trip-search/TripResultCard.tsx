@@ -36,12 +36,13 @@ export function TripResultCard({ trip, index }: { trip: TripOption; index: numbe
   const stayHours = Math.max(1, Math.round(trip.timeAtDestinationMinutes / 60));
   const allDirect = trip.outboundTransfers === 0 && trip.returnTransfers === 0;
   const themeClass = `transport-tone-${TRANSPORT_THEMES[trip.transportType]}`;
+  const displayDestination = meta.displayName || trip.destination;
 
   return (
     <article className={`trip-card palette-${meta.palette} ${themeClass}`} style={{ animationDelay: `${index * 70}ms` }}>
       <div className="trip-cover">
         {meta.image ? (
-          <img src={meta.image} alt={`${trip.destination} – ${meta.landmark}`} loading="lazy" />
+          <img src={meta.image} alt={`${displayDestination} – ${meta.landmark}, wizualizacja fotograficzna`} loading="lazy" />
         ) : (
           <div className="trip-cover-placeholder" aria-hidden="true">
             <Icon name={isTrain ? 'train' : isBus ? 'bus' : 'plane'} size={74} strokeWidth={1} />
@@ -56,11 +57,11 @@ export function TripResultCard({ trip, index }: { trip: TripOption; index: numbe
         </div>
         <div className="trip-cover-content">
           <small>{meta.country || 'Europa'}</small>
-          <h3>{trip.destination}</h3>
+          <h3>{displayDestination}</h3>
           <p>{meta.subtitle}</p>
-          <span className="trip-landmark-badge">
+          {meta.landmark && <span className="trip-landmark-badge">
             <Icon name="sparkles" size={13} /> {meta.landmark}
-          </span>
+          </span>}
         </div>
       </div>
 
@@ -100,9 +101,11 @@ export function TripResultCard({ trip, index }: { trip: TripOption; index: numbe
         </div>
         {expanded && <div className="trip-details" id={`details-${trip.id}`}>
           <div className="detail-line"><span>Podróż tam</span><strong>{formatTime(trip.outboundDeparture)} – {formatTime(trip.outboundArrival)}</strong></div>
-          <div className="detail-line"><span>Powrót ({trip.destination} → {trip.origin})</span><strong>{formatTime(trip.returnDeparture)} – {formatTime(trip.returnArrival)}</strong></div>
+          <div className="detail-line"><span>Powrót ({displayDestination} → {trip.origin})</span><strong>{formatTime(trip.returnDeparture)} – {formatTime(trip.returnArrival)}</strong></div>
           <div className="detail-line"><span>Łącznie w podróży</span><strong>{durationLabel(trip.totalTravelDurationMinutes)}</strong></div>
-          <div className="detail-line"><span>Znane miejsce na karcie</span><strong>{meta.landmark}</strong></div>
+          {meta.landmark && <div className="detail-line"><span>Znane miejsce na karcie</span><strong>{meta.landmark}</strong></div>}
+          {trip.destination !== displayDestination && <div className="detail-line"><span>Przystanek docelowy w źródle</span><strong>{trip.destination}</strong></div>}
+          {meta.image && <div className="live-detail-note"><Icon name="info" size={14} /> Obraz na karcie jest fotorealistyczną wizualizacją AI inspirowaną miejscem, a nie dokumentalną fotografią.</div>}
           <div className="detail-line"><span>Przesiadki tam / powrót</span><strong>{trip.outboundTransfers} / {trip.returnTransfers}</strong></div>
           <div className="live-detail-note"><Icon name="info" size={14} /> {isTrain ? 'Planowy rozkład PKP PLK, nie potwierdzona rezerwacja. API nie zawiera cen biletów. Sprawdź aktualny rozkład, taryfę i dostępność u przewoźnika.' : isBus ? 'Planowy rozkład FlixBus Europe GTFS (źródło: FlixBus France, licencja ODbL 1.0). Cena i dostępność miejsc nie są podane. Przed wyjazdem potwierdź kurs i cenę na stronie przewoźnika.' : 'Historyczna oferta znaleziona przez użytkowników Aviasales. Cena, dostępność i zasady bagażowe mogą się zmienić. Sprawdź ofertę przed zakupem.'}</div>
         </div>}
