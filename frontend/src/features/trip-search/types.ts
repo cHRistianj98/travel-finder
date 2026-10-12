@@ -25,7 +25,7 @@ export interface TripOption {
   returnDeparture: string;
   returnArrival: string;
   transportType: TransportType;
-  price: number;
+  price: number | null;
   currency: string;
   totalTravelDurationMinutes: number;
   timeAtDestinationMinutes: number;

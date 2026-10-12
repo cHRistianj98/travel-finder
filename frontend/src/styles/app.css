@@ -439,3 +439,19 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { -webkit-app
 .availability-popover .travel-day-disabled .travel-day-button { color: #b7c4b9; opacity: .4; cursor: not-allowed; }
 @media (max-width: 620px) { .availability-popover { left: -1px; right: auto; padding: 12px; } .availability-popover .travel-day-button { width: 36px; height: 36px; } }
 .availability-field .date-range-text { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* Kolej — cena nieobecna w otwartych rozkładach PLK */
+.train-budget-hint { display:flex; align-items:flex-start; gap:8px; margin:0 0 10px; color:#6a8274; font-size:11px; line-height:1.6; }
+.train-budget-hint svg { flex-shrink:0; margin-top:2px; }
+.train-unknown-price { font-size:22px !important; letter-spacing:-.035em; white-space:nowrap; }
+.transport-choice.transport-train:not(:disabled) { cursor:pointer; }
+
+/* PKP PLK — dostęp oczekuje na zatwierdzenie; nie sugeruj działającej integracji. */
+.transport-choice.waiting-access { opacity: .85; border-style: dashed; background: #f9faf6; cursor: not-allowed; }
+.transport-choice.waiting-access .transport-icon { color: #899e86; background: #edf1e9; }
+.transport-choice.waiting-access .transport-name small { color: #9a885a; white-space: normal; line-height: 1.25; }
+.transport-choice.waiting-access:hover { transform: none; border-color: #d6ded1; }
+.plk-waiting-notice { display: flex; align-items: flex-start; gap: 11px; margin-top: 13px; border: 1px solid #e5e8d6; background: #faf9f0; border-radius: 12px; padding: 13px; color: #6a6755; }
+.plk-waiting-icon { display: grid; place-items: center; flex: 0 0 32px; width: 32px; height: 32px; border-radius: 9px; background: #f1ecd4; color: #85774a; }
+.plk-waiting-notice strong { display: block; color: #4f5142; font-size: 11px; line-height: 1.45; }
+.plk-waiting-notice p { margin: 4px 0 0; font-size: 10px; line-height: 1.55; }

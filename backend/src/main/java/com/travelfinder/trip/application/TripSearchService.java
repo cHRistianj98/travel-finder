@@ -6,20 +6,44 @@ import com.travelfinder.trip.domain.TripSearchRequest;
 import com.travelfinder.trip.domain.AvailabilityCalendar;
 import com.travelfinder.trip.flight.FlightSearchProvider;
 import com.travelfinder.trip.flight.OriginAirports;
+import com.travelfinder.trip.train.TrainSearchProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 /**
- * Wyniki tylko od aktywnego providera; domyślnie cache Travelpayouts.
- * Pociąg/autobus/samochód pozostają nieaktywne, dopóki nie dodamy prawdziwych providerów.
+ * Loty z cache Travelpayouts oraz bezpośrednie pociągi z rozkładu PKP PLK.
+ * Żadnych mocków i żadnych wymyślonych cen; BUS/CAR pozostają nieaktywne.
  */
 @Service
 public class TripSearchService {
     private final FlightSearchProvider flightProvider;
+    private final TrainSearchProvider trainProvider;
+    private final boolean trainAvailable;
+
+    @Autowired
+    public TripSearchService(FlightSearchProvider flightProvider, TrainSearchProvider trainProvider,
+            @Value("${plk.enabled:false}") boolean plkEnabled,
+            @Value("${plk.api-key:}") String plkApiKey) {
+        this.flightProvider = flightProvider;
+        this.trainProvider = trainProvider;
+        this.trainAvailable = plkEnabled && trainProvider != null
+                && plkApiKey != null && !plkApiKey.isBlank() && !plkApiKey.startsWith("TU_WKLEJ_");
+    }
+
+    // Konstruktory dla testów jednostkowych z fałszywym gatewayem (bez Springa).
+    public TripSearchService(FlightSearchProvider flightProvider, TrainSearchProvider trainProvider) {
+        this(flightProvider, trainProvider, true, "test-key");
+    }
 
     public TripSearchService(FlightSearchProvider flightProvider) {
-        this.flightProvider = flightProvider;
+        this(flightProvider, null, false, "");
+    }
+
+    public boolean isTrainAvailable() {
+        return trainAvailable;
     }
 
     public List<TripOption> search(TripSearchRequest request) {
@@ -33,21 +57,31 @@ public class TripSearchService {
         if (request.earliestReturnDeparture().isAfter(request.latestReturnDeparture())) {
             throw new IllegalArgumentException("Zakres godzin wylotu powrotnego jest niepoprawny.");
         }
-        if (!request.transportTypes().contains(TransportType.FLIGHT)) {
-            throw new IllegalArgumentException("Na razie dostępne jest tylko wyszukiwanie prawdziwych lotów. Pociągi, autobusy i samochody dodamy później.");
+        boolean flight = request.transportTypes().contains(TransportType.FLIGHT);
+        boolean train = request.transportTypes().contains(TransportType.TRAIN);
+        if (!flight && !train) {
+            throw new IllegalArgumentException("Wybierz samolot lub pociąg. Autobusy i samochody dołączą później.");
         }
-        if (OriginAirports.airportFor(request.origin()).isEmpty()) {
+        if (flight && OriginAirports.airportFor(request.origin()).isEmpty()) {
             throw new IllegalArgumentException("Nie mamy jeszcze obsługiwanego lotniska dla miasta: " + request.origin());
         }
+        if (train && !trainAvailable && !flight) {
+            throw new IllegalArgumentException("Kolej: oczekiwanie na dostęp do danych PKP PLK. "
+                    + "Klucz musi zostać aktywowany, a integracja włączona w konfiguracji.");
+        }
 
-        // Żadnego mockowania ani fallbacku do przykładowych podróży.
-        // Brak oferty = pusta lista, błąd dostawcy = wyjątek.
-        return flightProvider.search(request).stream()
-                .filter(option -> option.transportType() == TransportType.FLIGHT)
+        java.util.List<TripOption> options = new java.util.ArrayList<>();
+        if (flight) options.addAll(flightProvider.search(request).stream()
+                .filter(option -> option.transportType() == TransportType.FLIGHT).toList());
+        if (train && trainAvailable) options.addAll(trainProvider.search(request).stream()
+                .filter(option -> option.transportType() == TransportType.TRAIN).toList());
+
+        // Bez cen pociągów z PLK nie odrzucamy ich według budżetu ani nie wymyślamy kwot.
+        return options.stream()
                 .filter(option -> availability.allowsTrip(option.outboundDeparture().toLocalDate(),
                         option.returnArrival().toLocalDate()))
                 .filter(option -> !option.returnArrival().toInstant().isBefore(option.outboundArrival().toInstant()))
-                .filter(option -> option.price().compareTo(request.maxTransportBudget()) <= 0)
+                .filter(option -> option.price() == null || option.price().compareTo(request.maxTransportBudget()) <= 0)
                 .filter(option -> !request.directOnly()
                         || (option.outboundTransfers() == 0 && option.returnTransfers() == 0))
                 .filter(option -> !option.outboundDeparture().toLocalTime()

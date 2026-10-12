@@ -4,6 +4,7 @@ import com.travelfinder.trip.application.TripSearchService;
 import com.travelfinder.trip.domain.TripOption;
 import com.travelfinder.trip.domain.TripSearchRequest;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,6 +20,12 @@ public class TripSearchController {
 
     public TripSearchController(TripSearchService service) {
         this.service = service;
+    }
+
+    /** Publiczny status funkcji bez udostępniania klucza API ani kontaktu z PLK. */
+    @GetMapping("/providers")
+    public java.util.Map<String, Boolean> providers() {
+        return java.util.Map.of("trainAvailable", service.isTrainAvailable());
     }
 
     @PostMapping("/search")
