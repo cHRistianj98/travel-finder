@@ -1,6 +1,7 @@
 package com.travelfinder.trip.domain;
 
 import jakarta.validation.constraints.DecimalMin;
+import com.travelfinder.trip.car.CarPreferences;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -24,10 +25,21 @@ public record TripSearchRequest(
         @NotEmpty(message = "Wybierz przynajmniej jeden środek transportu") Set<TransportType> transportTypes,
         boolean directOnly,
         // Opcjonalne: brak pola w starszym kliencie oznacza wszystkie dni w podanym przedziale.
-        Set<LocalDate> availableDates
+        Set<LocalDate> availableDates,
+        CarPreferences car
 ) {
     public TripSearchRequest {
         availableDates = availableDates == null ? Set.of() : Set.copyOf(availableDates);
+    }
+
+    public TripSearchRequest(String origin, LocalDate outboundDate, LocalDate returnDate,
+            LocalTime earliestOutboundDeparture, LocalTime latestOutboundDeparture,
+            LocalTime earliestReturnDeparture, LocalTime latestReturnDeparture,
+            BigDecimal maxTransportBudget, String currency, Set<TransportType> transportTypes,
+            boolean directOnly, Set<LocalDate> availableDates) {
+        this(origin, outboundDate, returnDate, earliestOutboundDeparture, latestOutboundDeparture,
+                earliestReturnDeparture, latestReturnDeparture, maxTransportBudget, currency,
+                transportTypes, directOnly, availableDates, null);
     }
 
     // Zachowujemy dotychczasowe wywołania w testach i starszych klientach API.
@@ -38,6 +50,6 @@ public record TripSearchRequest(
             boolean directOnly) {
         this(origin, outboundDate, returnDate, earliestOutboundDeparture, latestOutboundDeparture,
                 earliestReturnDeparture, latestReturnDeparture, maxTransportBudget, currency,
-                transportTypes, directOnly, Set.of());
+                transportTypes, directOnly, Set.of(), null);
     }
 }

@@ -7,6 +7,7 @@ import {
   nextWeekend,
   type TransportType,
   type TripSearchRequest,
+  type CarFuel,
 } from './types';
 import 'react-day-picker/style.css';
 
@@ -14,7 +15,7 @@ const TRANSPORTS: { type: TransportType; icon: IconName; title: string; subtitle
   { type: 'FLIGHT', icon: 'plane', title: 'Samolot', subtitle: 'Szybko i daleko', accent: 'flight' },
   { type: 'TRAIN', icon: 'train', title: 'Pociąg', subtitle: 'Rozkład PKP PLK', accent: 'train' },
   { type: 'BUS', icon: 'bus', title: 'Autobus', subtitle: 'FlixBus · rozkład GTFS', accent: 'bus' },
-  { type: 'CAR', icon: 'car', title: 'Samochód', subtitle: 'Wkrótce', accent: 'car' },
+  { type: 'CAR', icon: 'car', title: 'Samochód', subtitle: 'Paliwo · atrakcje · trasa', accent: 'car' },
 ];
 
 const TIME_OPTIONS = createTimeOptions();
@@ -41,6 +42,11 @@ export function TripSearchForm({ onSearch, loading, trainAccess, busAccess }: Pr
     currency: 'PLN',
     transportTypes: ['FLIGHT'],
     directOnly: true,
+    car: {
+      fuel: 'PETROL', litresPer100Km: 7.2, passengers: 1,
+      parkingPlnPerDay: 30, additionalTollsPln: 0,
+      useCzechMotorways: true, fuelPriceOverridePln: null, maxOneWayKm: 750,
+    },
   }));
   const [validationError, setValidationError] = useState<string | null>(null);
   const freeDays = form.availableDates.length;
@@ -52,6 +58,15 @@ export function TripSearchForm({ onSearch, loading, trainAccess, busAccess }: Pr
     setValidationError(null);
   }
 
+  function updateCar<K extends keyof NonNullable<TripSearchRequest['car']>>(key: K, value: NonNullable<TripSearchRequest['car']>[K]) {
+    setForm(previous => ({ ...previous, car: { ...previous.car!, [key]: value } }));
+    setValidationError(null);
+  }
+  function changeFuel(fuel: CarFuel) {
+    setForm(previous => ({ ...previous, car: {
+      ...previous.car!, fuel, litresPer100Km: fuel === 'DIESEL' ? 6.1 : fuel === 'LPG' ? 9.0 : 7.2,
+    } }));
+  }
   function setWideSearch() {
     setForm(previous => ({
       ...previous,
@@ -109,6 +124,14 @@ export function TripSearchForm({ onSearch, loading, trainAccess, busAccess }: Pr
       return;
     }
 
+    if (form.transportTypes.includes('CAR') && form.car && (
+        form.car.litresPer100Km < 2 || form.car.litresPer100Km > 30 ||
+        form.car.passengers < 1 || form.car.passengers > 9 ||
+        form.car.parkingPlnPerDay < 0 || form.car.additionalTollsPln < 0 ||
+        form.car.maxOneWayKm < 30 || form.car.maxOneWayKm > 1500)) {
+      setValidationError('Sprawdź ustawienia samochodu: spalanie, pasażerów, opłaty lub maksymalną odległość.');
+      return;
+    }
     onSearch({ ...form, origin: form.origin.trim() });
   }
 
@@ -214,7 +237,7 @@ export function TripSearchForm({ onSearch, loading, trainAccess, busAccess }: Pr
           <button type="button" className="flight-wide-button" onClick={setWideSearch}>Ustaw szerokie wyszukiwanie</button>
         </div>
         <label className="field-label" htmlFor="budget">Maksymalny budżet na transport</label>
-        {(form.transportTypes.includes('TRAIN') || form.transportTypes.includes('BUS')) && <p className="train-budget-hint"><Icon name="info" size={14} /> Rozkłady pociągów i autobusów nie zawierają cen — budżet dotyczy wyłącznie lotów. Koszt sprawdzisz u przewoźnika.</p>}
+        {(form.transportTypes.includes('TRAIN') || form.transportTypes.includes('BUS')) && <p className="train-budget-hint"><Icon name="info" size={14} /> Rozkłady pociągów i autobusów nie zawierają cen — budżet obejmuje loty oraz szacowany koszt samochodu na osobę (jeśli zaznaczony). Koszt sprawdzisz u przewoźnika.</p>}
         <div className="input-shell budget-shell">
           <Icon name="wallet" size={19} />
           <input id="budget" type="number" min="1" step="1" value={form.maxTransportBudget} onChange={e => update('maxTransportBudget', Number(e.target.value))} required />
@@ -231,14 +254,14 @@ export function TripSearchForm({ onSearch, loading, trainAccess, busAccess }: Pr
               <button
                 key={transport.type}
                 type="button"
-                className={`transport-choice transport-${transport.accent} ${selected ? 'selected' : ''} ${transport.type === 'CAR' || (transport.type === 'BUS' && !busAccess) ? 'coming-soon' : ''} ${transport.type === 'TRAIN' && trainAccess !== 'active' ? 'waiting-access' : ''}`}
+                className={`transport-choice transport-${transport.accent} ${selected ? 'selected' : ''} ${(transport.type === 'BUS' && !busAccess) ? 'coming-soon' : ''} ${transport.type === 'TRAIN' && trainAccess !== 'active' ? 'waiting-access' : ''}`}
                 aria-pressed={selected}
-                disabled={transport.type === 'CAR' || (transport.type === 'BUS' && !busAccess) || (transport.type === 'TRAIN' && trainAccess !== 'active')}
+                disabled={(transport.type === 'BUS' && !busAccess) || (transport.type === 'TRAIN' && trainAccess !== 'active')}
                 onClick={() => update('transportTypes', selected
                   ? form.transportTypes.filter(mode => mode !== transport.type)
                   : [...form.transportTypes, transport.type])}
                 title={transport.type === 'TRAIN' ? (trainAccess === 'active' ? 'Planowane rozkłady PKP PLK' : 'Oczekiwanie na aktywację dostępu PKP PLK') :
-                  transport.type === 'BUS' ? (busAccess ? 'Planowane bezpośrednie kursy FlixBus, bez cen' : 'Źródło GTFS jest wyłączone') : transport.type === 'FLIGHT' ? 'Historyczne oferty lotnicze z Aviasales' : 'Ten transport dodamy później'}
+                  transport.type === 'BUS' ? (busAccess ? 'Planowane bezpośrednie kursy FlixBus, bez cen' : 'Źródło GTFS jest wyłączone') : transport.type === 'FLIGHT' ? 'Historyczne oferty lotnicze z Aviasales' : 'Koszt auta, parking i katalog atrakcji PL/CZ/DE'}
               >
                 <span className="transport-icon"><Icon name={transport.icon} size={20} /></span>
                 <span className="transport-name"><strong>{transport.title}</strong><small>{transport.type === 'TRAIN' && trainAccess !== 'active'
@@ -249,6 +272,36 @@ export function TripSearchForm({ onSearch, loading, trainAccess, busAccess }: Pr
             );
           })}
         </div>
+        {form.transportTypes.includes('CAR') && form.car && <div className="car-config">
+          <div className="car-config-heading"><Icon name="car" size={18}/><div><strong>Ustaw swój samochód</strong><small>Obliczamy koszt całego auta i cenę na osobę, bez płatnego API.</small></div></div>
+          <div className="car-config-fields">
+            <label>Rodzaj paliwa
+              <select value={form.car.fuel} onChange={event => changeFuel(event.target.value as CarFuel)}>
+                <option value="PETROL">Benzyna Pb95</option><option value="DIESEL">Diesel</option><option value="LPG">LPG (autogaz)</option>
+              </select>
+            </label>
+            <label>Spalanie (l/100 km)
+              <input type="number" min="2" max="30" step="0.1" value={form.car.litresPer100Km} onChange={e=>updateCar('litresPer100Km', Number(e.target.value))}/>
+            </label>
+            <label>Osoby w aucie
+              <input type="number" min="1" max="9" step="1" value={form.car.passengers} onChange={e=>updateCar('passengers', Number(e.target.value))}/>
+            </label>
+            <label>Maks. km w jedną stronę
+              <input type="number" min="30" max="1500" step="50" value={form.car.maxOneWayKm} onChange={e=>updateCar('maxOneWayKm', Number(e.target.value))}/>
+            </label>
+            <label>Rezerwa na parking (PLN/dzień)
+              <input type="number" min="0" max="500" step="5" value={form.car.parkingPlnPerDay} onChange={e=>updateCar('parkingPlnPerDay', Number(e.target.value))}/>
+            </label>
+            <label>Dodatkowe opłaty drogowe (PLN)
+              <input type="number" min="0" max="2000" step="5" value={form.car.additionalTollsPln} onChange={e=>updateCar('additionalTollsPln', Number(e.target.value))}/>
+            </label>
+            <label>Cena paliwa PLN/l (opcjonalnie)
+              <input type="number" min="0.5" max="20" step="0.01" placeholder="Automatyczna / szacunkowa" value={form.car.fuelPriceOverridePln ?? ''} onChange={e=>updateCar('fuelPriceOverridePln', e.target.value === '' ? null : Number(e.target.value))}/>
+            </label>
+          </div>
+          <label className="car-config-vignette"><input type="checkbox" checked={form.car.useCzechMotorways} onChange={e=>updateCar('useCzechMotorways',e.target.checked)}/><span>Uwzględnij czeską winietę autostradową (orientacyjnie)</span></label>
+          <p><Icon name="info" size={14}/> Dystans i czas: szacunek drogowy, nie dane nawigacji. Parking: rezerwa, nie aktualny cennik. Benzyna i diesel: bezpłatne notowania tygodniowe, jeśli dostępne; LPG może korzystać z jawnego założenia. Czeska winieta: domyślnie dla celów w Czechach, nawet jeśli istnieje droga bezpłatna.</p>
+        </div>}
         {trainAccess !== 'active' && <div className="plk-waiting-notice" role="status">
           <span className="plk-waiting-icon"><Icon name="hourglass" size={20} /></span>
           <div>
@@ -265,7 +318,7 @@ export function TripSearchForm({ onSearch, loading, trainAccess, busAccess }: Pr
 
       {validationError && <p className="form-error" role="alert"><Icon name="alert" size={16} />{validationError}</p>}
       <button className="submit-button" type="submit" disabled={loading}>{loading ? <><span className="button-spinner" />Szukam kierunków...</> : <><Icon name="search" size={20} /> Odkryj kierunki <Icon name="arrow-right" size={20} className="submit-arrow" /></>}</button>
-      <div className="form-disclaimer"><Icon name="info" size={14} /> Loty: orientacyjne ceny z cache Aviasales. {trainAccess === 'active' ? 'Pociągi: planowe rozkłady PKP PLK bez cen biletów.' : 'Pociągi: oczekiwanie na aktywację dostępu PKP PLK.'} Autobusy: rozkład FlixBus Europe GTFS, bez cen. Zawsze potwierdź rozkład, dostępność i cenę przed podróżą.</div>
+      <div className="form-disclaimer"><Icon name="info" size={14} /> Loty: orientacyjne ceny z cache Aviasales. {trainAccess === 'active' ? 'Pociągi: planowe rozkłady PKP PLK bez cen biletów.' : 'Pociągi: oczekiwanie na aktywację dostępu PKP PLK.'} Autobusy: rozkład FlixBus Europe GTFS, bez cen. Auto: szacunki paliwa/parkingu i kosztu przejazdu, bez gwarancji. Zawsze potwierdź rozkład, dostępność i cenę przed podróżą.</div>
     </form>
   );
 }

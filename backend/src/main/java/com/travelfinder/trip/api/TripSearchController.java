@@ -1,6 +1,7 @@
 package com.travelfinder.trip.api;
 
 import com.travelfinder.trip.application.TripSearchService;
+import com.travelfinder.trip.car.CarAttractionCatalog;
 import com.travelfinder.trip.scoring.TravelScoringService;
 import com.travelfinder.trip.bus.FlixBusPublicPreviewService;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -32,6 +33,12 @@ public class TripSearchController {
         this.service = service;
         this.busPreviewService = busPreviewService;
         this.scoringService = scoringService;
+    }
+
+    /** Liczba i wykaz celów samochodowych — lokalny katalog, bez dodatkowego API. */
+    @GetMapping("/car/attractions")
+    public List<CarAttractionCatalog.Attraction> carAttractions() {
+        return CarAttractionCatalog.all();
     }
 
     /** Publiczny status funkcji bez udostępniania klucza API ani kontaktu z PLK. */

@@ -8,6 +8,7 @@ import com.travelfinder.trip.flight.FlightSearchProvider;
 import com.travelfinder.trip.flight.OriginAirports;
 import com.travelfinder.trip.train.TrainSearchProvider;
 import com.travelfinder.trip.bus.BusSearchProvider;
+import com.travelfinder.trip.car.CarTripProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -23,21 +24,29 @@ public class TripSearchService {
     private final FlightSearchProvider flightProvider;
     private final TrainSearchProvider trainProvider;
     private final BusSearchProvider busProvider;
+    private final CarTripProvider carProvider;
     private final boolean trainAvailable;
     private final boolean busAvailable;
 
     @Autowired
     public TripSearchService(FlightSearchProvider flightProvider, TrainSearchProvider trainProvider,
-            BusSearchProvider busProvider,
+            BusSearchProvider busProvider, CarTripProvider carProvider,
             @Value("${plk.enabled:false}") boolean plkEnabled,
             @Value("${plk.api-key:}") String plkApiKey,
             @Value("${bus.enabled:true}") boolean busEnabled) {
         this.flightProvider = flightProvider;
         this.trainProvider = trainProvider;
         this.busProvider = busProvider;
+        this.carProvider = carProvider;
         this.busAvailable = busEnabled && busProvider != null;
         this.trainAvailable = plkEnabled && trainProvider != null
                 && plkApiKey != null && !plkApiKey.isBlank() && !plkApiKey.startsWith("TU_WKLEJ_");
+    }
+
+    // Dotychczasowy konstruktor testowy (bez zależności samochodowej).
+    public TripSearchService(FlightSearchProvider flightProvider, TrainSearchProvider trainProvider,
+            BusSearchProvider busProvider, boolean plkEnabled, String plkApiKey, boolean busEnabled) {
+        this(flightProvider, trainProvider, busProvider, null, plkEnabled, plkApiKey, busEnabled);
     }
 
     // Zachowujemy dotychczasowe konstruktory w testach.
@@ -82,18 +91,19 @@ public class TripSearchService {
         boolean flight = request.transportTypes().contains(TransportType.FLIGHT);
         boolean train = request.transportTypes().contains(TransportType.TRAIN);
         boolean bus = request.transportTypes().contains(TransportType.BUS);
-        if (!flight && !train && !bus) {
-            throw new IllegalArgumentException("Wybierz samolot, pociąg lub autobus. Samochody dołączą później.");
+        boolean car = request.transportTypes().contains(TransportType.CAR);
+        if (!flight && !train && !bus && !car) {
+            throw new IllegalArgumentException("Wybierz co najmniej jeden środek transportu.");
         }
         if (flight && OriginAirports.airportFor(request.origin()).isEmpty()) {
             throw new IllegalArgumentException("Nie mamy jeszcze obsługiwanego lotniska dla miasta: " + request.origin());
         }
-        if (train && !trainAvailable && !flight && !(bus && busAvailable)) {
+        if (train && !trainAvailable && !flight && !car && !(bus && busAvailable)) {
             throw new IllegalArgumentException("Kolej: oczekiwanie na dostęp do danych PKP PLK. "
                     + "Klucz musi zostać aktywowany, a integracja włączona w konfiguracji.");
         }
 
-        if (bus && !busAvailable && !flight && !(train && trainAvailable)) {
+        if (bus && !busAvailable && !flight && !car && !(train && trainAvailable)) {
             throw new IllegalArgumentException("Autobusy: źródło rozkładów GTFS jest wyłączone w konfiguracji.");
         }
 
@@ -102,8 +112,13 @@ public class TripSearchService {
                 .filter(option -> option.transportType() == TransportType.FLIGHT).toList());
         if (train && trainAvailable) options.addAll(trainProvider.search(request).stream()
                 .filter(option -> option.transportType() == TransportType.TRAIN).toList());
+        if (car && carProvider != null) options.addAll(carProvider.search(request));
         if (bus && busAvailable) options.addAll(busProvider.search(request).stream()
                 .filter(option -> option.transportType() == TransportType.BUS).toList());
+
+        if (car && carProvider == null && !flight && !(train && trainAvailable) && !(bus && busAvailable)) {
+            throw new IllegalArgumentException("Wyszukiwanie samochodem jest chwilowo niedostępne.");
+        }
 
         // Bez cen pociągów i autobusów nie odrzucamy ich według budżetu ani nie wymyślamy kwot.
         return options.stream()

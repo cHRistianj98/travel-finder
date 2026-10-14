@@ -2,6 +2,39 @@ import { resolveDestinationMeta } from './destinationVisuals';
 
 export type TransportType = 'FLIGHT' | 'TRAIN' | 'BUS' | 'CAR';
 
+export type CarFuel = 'PETROL' | 'DIESEL' | 'LPG';
+export interface CarPreferences {
+  fuel: CarFuel;
+  litresPer100Km: number;
+  passengers: number;
+  parkingPlnPerDay: number;
+  additionalTollsPln: number;
+  useCzechMotorways: boolean;
+  fuelPriceOverridePln: number | null;
+  maxOneWayKm: number;
+}
+export interface CarTripDetails {
+  landmark: string;
+  country: 'PL' | 'CZ' | 'DE';
+  nearbyAttractions: number;
+  oneWayKm: number;
+  roundTripKm: number;
+  drivingMinutesEachWay: number;
+  passengers: number;
+  litresPer100Km: number;
+  fuelType: string;
+  fuelPricePlnPerLitre: number;
+  fuelPriceSource: string;
+  fuelPriceDate: string;
+  fuelCostPln: number;
+  vignettePln: number;
+  parkingPln: number;
+  extraTollsPln: number;
+  totalCarCostPln: number;
+  roadEstimate: boolean;
+  tollNotice: string;
+}
+
 export interface TripSearchRequest {
   origin: string;
   outboundDate: string; // YYYY-MM-DD
@@ -15,6 +48,7 @@ export interface TripSearchRequest {
   currency: 'PLN';
   transportTypes: TransportType[];
   directOnly: boolean;
+  car?: CarPreferences;
 }
 
 /** Niezależny od konkretnego API providera — lustrzany DTO backendu. */
@@ -35,6 +69,7 @@ export interface TripOption {
   returnTransfers: number;
   provider: string;
   bookingUrl: string | null;
+  carDetails?: CarTripDetails | null;
 }
 
 export interface DestinationMeta {

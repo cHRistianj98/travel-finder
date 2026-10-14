@@ -56,8 +56,10 @@ public class TravelScoringService {
                 freeDaytimeMinutes += minutes;
             }
         }
-        TravelDestinationCatalog.Place place = TravelDestinationCatalog.find(trip.destination());
-        Integer distanceKm = TravelDestinationCatalog.distanceKm(trip.origin(), trip.destination());
+        boolean isCar = trip.transportType() == com.travelfinder.trip.domain.TransportType.CAR && trip.carDetails() != null;
+        var car = trip.carDetails();
+        TravelDestinationCatalog.Place place = isCar ? null : TravelDestinationCatalog.find(trip.destination());
+        Integer distanceKm = isCar ? car.oneWayKm() : TravelDestinationCatalog.distanceKm(trip.origin(), trip.destination());
 
         BigDecimal budget = request.maxTransportBudget();
         if (trip.price() == null || budget == null || budget.signum() <= 0 || !"PLN".equalsIgnoreCase(trip.currency())) {
@@ -66,9 +68,11 @@ public class TravelScoringService {
             cautions.add("Cena wybranych kursów jest nieznana");
         } else {
             double ratio = trip.price().doubleValue() / budget.doubleValue();
-            double priceScore = clamp(0.24 + 0.76 * (1 - Math.min(1, Math.max(0, ratio))), 0, 1);
+            double priceScore = clamp(0.24 + 0.76 * (1 - Math.min(1, Math.max(0, ratio))), 0, 1) * (isCar ? .90 : 1);
             add(criteria, profile, Criterion.PRICE, priceScore,
-                    "Cena z oferty: " + money(trip.price()) + " / limit " + money(budget) + ". Dla lotów może być historyczna.");
+                    (isCar ? "SZACUNKOWY koszt samochodu NA OSOBĘ: " : "Cena z oferty: ") + money(trip.price())
+                            + " / limit " + money(budget) + ". "
+                            + (isCar ? "Paliwo, parking i ewentualna winieta to planistyczne założenia; nie oferta ani rzeczywista opłata." : "Dla lotów może być historyczna."));
             if (ratio <= 0.45) strengths.add("Tani transport względem budżetu");
             if (ratio >= 0.90) cautions.add("Cena blisko limitu budżetu");
         }
@@ -93,9 +97,18 @@ public class TravelScoringService {
         double changeFactor = switch (Math.min(transfers, 3)) { case 0 -> 1; case 1 -> .67; case 2 -> .40; default -> .18; };
         double transportHours = Math.max(0, trip.totalTravelDurationMinutes() / 60d);
         double timeFactor = clamp(1 - Math.max(0, transportHours - 3) / 20, .15, 1);
-        add(criteria, profile, Criterion.COMFORT, .70 * changeFactor + .30 * timeFactor,
-                transfers + " przesiadek łącznie; " + formatHours(trip.totalTravelDurationMinutes()) + " w trasie. Komfort to heurystyka, nie ocena siedzeń i bagażu.");
-        if (transfers == 0) strengths.add("Podróż bez przesiadek");
+        double comfortFactor = isCar ? clamp(.40 + .60 * timeFactor - Math.max(0, transportHours - 8) * .035, .05, 1)
+                : .70 * changeFactor + .30 * timeFactor;
+        add(criteria, profile, Criterion.COMFORT, comfortFactor,
+                (isCar ? "Samodzielna jazda: " + formatHours(trip.totalTravelDurationMinutes()) + " za kierownicą w obie strony. Długie przejazdy męczą kierowcę."
+                        : transfers + " przesiadek łącznie; " + formatHours(trip.totalTravelDurationMinutes()) + " w trasie. Komfort to heurystyka, nie ocena siedzeń i bagażu."));
+        if (isCar) {
+            strengths.add("Własny samochód: swoboda zmiany planu i postojów");
+            if (car.drivingMinutesEachWay() > 300) cautions.add("Ponad 5 godzin prowadzenia w jedną stronę");
+            if (car.parkingPln().signum() > 0) cautions.add("Parkowanie wymaga budżetu i znalezienia miejsca");
+            if (car.vignettePln().signum() > 0) cautions.add("Możliwa czeska winieta na autostradę");
+        }
+        if (!isCar && transfers == 0) strengths.add("Podróż bez przesiadek");
         if (transfers >= 2) cautions.add("Przesiadki mogą zwiększyć ryzyko opóźnień");
 
         // Oceniamy rzeczywistą porę przyjazdu i powrotu; nie samo «odlot rano».
@@ -105,8 +118,9 @@ public class TravelScoringService {
         double outboundHome = hourOfDay(trip.outboundDeparture());
         double timing = .40 * comfortHour(arrival, 9, 20) + .25 * comfortHour(returnDeparture, 8, 22)
                 + .20 * comfortHour(arrivalHome, 7, 23) + .15 * comfortHour(outboundHome, 6, 23);
+        if (isCar) timing = Math.min(1, .68 + .32 * timing); // Premia za elastyczne terminy i postoje.
         add(criteria, profile, Criterion.SCHEDULE, timing,
-                "Przyjazd na miejsce " + trip.outboundArrival().toLocalTime().withSecond(0)
+                (isCar ? "Orientacyjne godziny samochodem (wybór kierowcy w dozwolonych przedziałach); " : "") + "Przyjazd na miejsce " + trip.outboundArrival().toLocalTime().withSecond(0)
                         + ", wyjazd powrotny " + trip.returnDeparture().toLocalTime().withSecond(0)
                         + ", powrót do domu " + trip.returnArrival().toLocalTime().withSecond(0) + ".");
         if (arrival < 6 || arrival >= 23) cautions.add("Przyjazd nocą utrudnia logistykę");
@@ -116,20 +130,22 @@ public class TravelScoringService {
             add(criteria, profile, Criterion.DISTANCE, null, "Brak wiarygodnego położenia miasta w lokalnym katalogu.");
         } else {
             // Preferencja relatywnie bliskich wypadów, nie twierdzenie o dojeździe z lotniska.
-            double closeness = clamp(1 - Math.max(0, distanceKm - 100) / 3100d, .12, 1);
+            double closeness = isCar ? clamp(1 - Math.max(0, distanceKm - 70) / 750d, .08, 1)
+                    : clamp(1 - Math.max(0, distanceKm - 100) / 3100d, .12, 1);
             add(criteria, profile, Criterion.DISTANCE, closeness,
-                    "Około " + distanceKm + " km w linii prostej między centrami miast. NIE uwzględnia transferu z lotniska/dworca.");
+                    isCar ? "Szacunkowo " + distanceKm + " km w JEDNĄ stronę drogami (Haversine × współczynnik). To NIE jest dystans wyznaczony przez nawigację."
+                            : "Około " + distanceKm + " km w linii prostej między centrami miast. NIE uwzględnia transferu z lotniska/dworca.");
         }
 
-        List<String> attractions = place == null ? List.of() : place.highlights();
+        List<String> attractions = isCar ? List.of(car.landmark()) : place == null ? List.of() : place.highlights();
         if (attractions.isEmpty()) {
             add(criteria, profile, Criterion.ATTRACTIONS, null, "Brak tego miasta w redakcyjnym katalogu atrakcji.");
         } else {
-            double value = Math.min(1, attractions.size() / 4d);
+            double value = isCar ? Math.min(1, .22 + .15 * car.nearbyAttractions()) : Math.min(1, attractions.size() / 4d);
             add(criteria, profile, Criterion.ATTRACTIONS, value,
-                    attractions.size() + " przykłady atrakcji w naszym katalogu, nie całkowita liczba atrakcji miasta: "
+                    (isCar ? car.nearbyAttractions() + " punkty turystyczne w promieniu ~45 km w katalogu (w tym wybrany cel): " : attractions.size() + " przykłady atrakcji w naszym katalogu, nie całkowita liczba atrakcji miasta: ") + ""
                             + String.join(", ", attractions.stream().limit(4).toList()) + ".");
-            if (attractions.size() >= 4) strengths.add("Bogaty wybór atrakcji w katalogu");
+            if (isCar ? car.nearbyAttractions() >= 4 : attractions.size() >= 4) strengths.add("Bogaty wybór atrakcji w katalogu");
         }
 
         boolean transportMatches = request.transportTypes() != null && request.transportTypes().contains(trip.transportType());
@@ -142,8 +158,10 @@ public class TravelScoringService {
         add(criteria, profile, Criterion.MATCH, match,
                 "Transport, budżet (gdy cena znana), bezpośredniość i oba przedziały godzin. Wymagania obowiązkowe nadal filtruje wyszukiwarka.");
 
-        double confidence = trip.price() == null ? .30 : .52;
-        String confidenceDetail = "Planowe GTFS/PLK lub historyczne cache nie potwierdzają dostępności miejsca na wybrany kurs.";
+        double confidence = isCar ? .40 : trip.price() == null ? .30 : .52;
+        String confidenceDetail = isCar
+                ? "SAMOCHÓD: brak potwierdzonej nawigacji i aktualnych stawek parkingowych/opłat drogowych. Koszt, dystans i czas to szacunki; źródło paliwa: " + car.fuelPriceSource() + "."
+                : "Planowe GTFS/PLK lub historyczne cache nie potwierdzają dostępności miejsca na wybrany kurs.";
         if (trip.price() == null) confidenceDetail += " Brak ceny dokładnej podróży.";
         add(criteria, profile, Criterion.CONFIDENCE, confidence, confidenceDetail);
 
