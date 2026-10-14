@@ -3,6 +3,7 @@ import { Icon, type IconName } from '../../components/Icon';
 import { resolveDestinationMeta } from './destinationVisuals';
 import { flixBusDateSummary, flixBusSearchLink } from './flixBusBooking';
 import { fetchFlixBusPreview, type FlixBusPublicPreview } from './flixBusPreview';
+import type { TravelScore } from './travelScore';
 import {
   TRANSPORT_LABELS,
   durationLabel,
@@ -28,7 +29,7 @@ const TRANSPORT_THEMES: Record<TransportType, string> = {
   CAR: 'car',
 };
 
-export function TripResultCard({ trip, index }: { trip: TripOption; index: number }) {
+export function TripResultCard({ trip, index, score }: { trip: TripOption; index: number; score?: TravelScore }) {
   const [expanded, setExpanded] = useState(false);
   const cardRef = useRef<HTMLElement>(null);
   const [preview, setPreview] = useState<FlixBusPublicPreview | null>(null);
@@ -93,6 +94,9 @@ export function TripResultCard({ trip, index }: { trip: TripOption; index: numbe
           </span>
           <span className="trip-badge">{isTrain ? 'PKP PLK · rozkład' : isBus ? 'FlixBus · GTFS' : 'Aviasales · cache'}</span>
         </div>
+        {score && <div className="travel-score-cover" title={score.partial ? `Travel Score: ${score.value}/100; dostępne kryteria ${score.availablePoints}/100 pkt` : `Travel Score: ${score.value}/100`}>
+          <Icon name="sparkles" size={13} /> <strong>{score.value}</strong><span>/100</span>
+        </div>}
         <div className="trip-cover-content">
           <small>{meta.country || 'Europa'}</small>
           <h3>{displayDestination}</h3>
@@ -104,6 +108,21 @@ export function TripResultCard({ trip, index }: { trip: TripOption; index: numbe
       </div>
 
       <div className="trip-card-body">
+        {score && <div className="travel-score-summary">
+          <div className="travel-score-summary-line">
+            <strong><Icon name="sparkles" size={14}/> Travel Score <span>{score.value}/100</span></strong>
+            <span className={`travel-score-rating ${score.value >= 75 ? 'high' : score.value >= 50 ? 'mid' : 'low'}`}>
+              {score.partial ? 'Ocena częściowa' : score.value >= 75 ? 'Bardzo dobry' : score.value >= 50 ? 'Warto rozważyć' : 'Słabsze dopasowanie'}
+            </span>
+          </div>
+          <div className="travel-score-meter" role="meter" aria-label="Ocena atrakcyjności podróży" aria-valuemin={0} aria-valuemax={100} aria-valuenow={score.value}>
+            <span style={{ width: `${score.value}%` }} />
+          </div>
+          <div className="travel-score-summary-sub">
+            {score.strengths[0] || 'Ocena na podstawie dostępnych parametrów'}
+            {score.partial && <span>· Dane: {score.availablePoints}/100 pkt</span>}
+          </div>
+        </div>}
         <div className="trip-price-row">
           <div>
             <span className="micro-label">{isBus && trip.price === null ? 'Ceny publikowane na stronach tras' : isSchedule ? 'Cena biletu' : 'Cena orientacyjna'}</span>
@@ -164,6 +183,27 @@ export function TripResultCard({ trip, index }: { trip: TripOption; index: numbe
           {trip.destination !== displayDestination && <div className="detail-line"><span>Przystanek docelowy w źródle</span><strong>{trip.destination}</strong></div>}
           {meta.image && <div className="live-detail-note"><Icon name="info" size={14} /> Obraz na karcie jest fotorealistyczną wizualizacją AI inspirowaną miejscem, a nie dokumentalną fotografią.</div>}
           <div className="detail-line"><span>Przesiadki tam / powrót</span><strong>{trip.outboundTransfers} / {trip.returnTransfers}</strong></div>
+          {score && <div className="travel-score-detail">
+            <div className="travel-score-detail-heading"><Icon name="sparkles" size={15}/> Skąd wynik {score.value}/100?
+              <span>{score.partial ? `${score.unknownPoints} pkt — brak danych` : 'Pełne dane'}</span>
+            </div>
+            <div className="travel-score-criteria">
+              {score.criteria.map(criterion => <div key={criterion.key} className="travel-score-criterion">
+                <div className="travel-score-criterion-heading"><strong>{criterion.label}</strong><span>{criterion.points === null ? 'brak danych' : `${criterion.points}/${criterion.maxPoints} pkt`}</span></div>
+                <div className={`travel-score-criterion-bar${criterion.points === null ? ' missing' : ''}`}>
+                  {criterion.points !== null && <span style={{ width: `${criterion.maxPoints ? criterion.points / criterion.maxPoints * 100 : 0}%` }} />}
+                </div>
+                <p>{criterion.explanation}</p>
+              </div>)}
+            </div>
+            {score.strengths.length > 0 && <div className="travel-score-explanations">
+              {score.strengths.map((reason, i) => <span key={`plus-${i}`} className="positive"><Icon name="check" size={13}/>{reason}</span>)}
+            </div>}
+            {score.cautions.length > 0 && <div className="travel-score-explanations">
+              {score.cautions.map((reason, i) => <span key={`warning-${i}`} className="caution"><Icon name="alert" size={13}/>{reason}</span>)}
+            </div>}
+            <p className="travel-score-clarification">Brak danych oznacza brak przyznanych punktów — nie ocenę 0/10 samego miasta. Katalog atrakcji jest przykładowy, a odległość nie oznacza dojazdu z lotniska.</p>
+          </div>}
           {isBus && <div className="bus-check-panel">
             <div className="bus-check-heading"><Icon name="ticket" size={15} /> Sprawdź obie ceny przed zakupem</div>
             <div className="bus-check-leg"><span>Wyjazd: {formatDate(trip.outboundDeparture)} o {formatTime(trip.outboundDeparture)} · {trip.origin} → {displayDestination}</span></div>

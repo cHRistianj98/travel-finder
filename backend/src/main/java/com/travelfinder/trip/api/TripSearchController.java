@@ -1,6 +1,7 @@
 package com.travelfinder.trip.api;
 
 import com.travelfinder.trip.application.TripSearchService;
+import com.travelfinder.trip.scoring.TravelScoringService;
 import com.travelfinder.trip.bus.FlixBusPublicPreviewService;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.http.HttpStatus;
@@ -24,10 +25,13 @@ public class TripSearchController {
 
     private final TripSearchService service;
     private final FlixBusPublicPreviewService busPreviewService;
+    private final TravelScoringService scoringService;
 
-    public TripSearchController(TripSearchService service, FlixBusPublicPreviewService busPreviewService) {
+    public TripSearchController(TripSearchService service, FlixBusPublicPreviewService busPreviewService,
+            TravelScoringService scoringService) {
         this.service = service;
         this.busPreviewService = busPreviewService;
+        this.scoringService = scoringService;
     }
 
     /** Publiczny status funkcji bez udostępniania klucza API ani kontaktu z PLK. */
@@ -52,6 +56,12 @@ public class TripSearchController {
         String destination = busPreviewService.searchLink(from, to, date);
         // URL pochodzi tylko z dwóch zaufanych generatorów (flixbus.com), a nie z requestu.
         return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(destination)).build();
+    }
+
+    /** Przelicz profil rankingu bez ponownego odpytywania zewnętrznych providerów. */
+    @PostMapping("/score")
+    public List<TravelScoringService.ScoredTrip> score(@RequestBody TravelScoringService.ScoreRequest payload) {
+        return scoringService.scoreAll(payload);
     }
 
     @PostMapping("/search")
