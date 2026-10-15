@@ -6,7 +6,11 @@ import java.util.*;
 /** Redakcyjny katalog regionów/celów. Współrzędne orientacyjne punktu atrakcji, nie wjazdu na parking. */
 public final class CarAttractionCatalog {
     private CarAttractionCatalog() {}
-    public record Attraction(String country, String city, String landmark, double lat, double lon, int interest) {
+    public record Attraction(String country, String city, String landmark, double lat, double lon, int interest,
+                             String category, String source, int sourceQuality) {
+        public Attraction(String country, String city, String landmark, double lat, double lon, int interest) {
+            this(country, city, landmark, lat, lon, interest, "Katalog redakcyjny", "EDITORIAL", 0);
+        }
         public String destination() { return city + " — " + landmark; }
     }
     // Dane punktowe orientacyjne. Aktualna dostępność oraz dojazdy do wejścia wymagają sprawdzenia na miejscu.
@@ -142,7 +146,38 @@ DE|Stuttgart|Muzeum Mercedes-Benz|48.789|9.232|4
 DE|Düsseldorf|Promenada nad Renem|51.229|6.770|4
 DE|Brema|Rynek i ratusz|53.077|8.806|4
 """;
-    private static final List<Attraction> ATTRACTIONS = parse(DATA);
+    private static final List<Attraction> EDITORIAL = parse(DATA);
+    private static volatile List<Attraction> ATTRACTIONS = EDITORIAL;
+    private static volatile int generation = 0;
+
+    /** Wątek importera publikuje nową niezmienną listę atomowo; stara wersja jest zawsze dostępna. */
+    public static synchronized int useImported(List<Attraction> imported) {
+        Objects.requireNonNull(imported);
+        Map<String, Attraction> unique = new LinkedHashMap<>();
+        for (Attraction entry : EDITORIAL) unique.put(normalize(entry.destination()), entry);
+        int count = 0;
+        for (Attraction entry : imported) {
+            if (entry == null || count >= 4000 || !Double.isFinite(entry.lat()) || !Double.isFinite(entry.lon())
+                    || entry.lat() < 40 || entry.lat() > 60 || entry.lon() < 0 || entry.lon() > 35
+                    || entry.interest() < 1 || entry.interest() > 5 || entry.destination().isBlank()) continue;
+            if (estimatedRoadKmFromWroclaw(entry) > 1500) continue;
+            String key = normalize(entry.destination());
+            if (unique.containsKey(key)) continue; // pierwszeństwo sprawdzonych wpisów redakcyjnych
+            unique.put(key, entry);
+            count++;
+        }
+        ATTRACTIONS = List.copyOf(unique.values());
+        generation++;
+        return count;
+    }
+    public static int generation() { return generation; }
+    public static int editorialCount() { return EDITORIAL.size(); }
+    public static int importedCount() { return ATTRACTIONS.size() - EDITORIAL.size(); }
+    public static int estimatedRoadKmFromWroclaw(Attraction entry) {
+        double km = distanceKm(51.1079, 17.0385, entry.lat(), entry.lon());
+        return (int) Math.ceil(km * (km < 140 ? 1.38 : km < 380 ? 1.30 : 1.25) + 8);
+    }
+    public static List<Attraction> editorial() { return EDITORIAL; }
     private static List<Attraction> parse(String data) {
         List<Attraction> output = new ArrayList<>();
         for (String line : data.split("\\R")) {

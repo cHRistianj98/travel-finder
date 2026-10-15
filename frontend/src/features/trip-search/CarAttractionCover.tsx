@@ -123,13 +123,16 @@ interface Props {
 export function CarAttractionCover({ destination, landmark, className }: Props) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const visual: CarVisual | undefined = getCarVisual(destination);
+  // Nowy katalog OSM nie ma ręcznie dodanych 1000 osobnych mapowań obrazów.
+  // Wyszukujemy więc fotografię konkretnego obiektu, zachowując autora i licencję.
+  const commonsQuery = visual?.commonsQuery ?? `${landmark} ${destination.split(' — ')[0].replace(/^okolice /i, '')}`;
   const [photo, setPhoto] = useState<CommonsPhoto | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
     setPhoto(null);
     setImageFailed(false);
-    if (!visual?.commonsQuery) return;
+    if (!commonsQuery) return;
     let alive = true;
     const node = rootRef.current;
     if (!node) return;
@@ -137,7 +140,7 @@ export function CarAttractionCover({ destination, landmark, className }: Props) 
     const load = () => {
       if (launched) return;
       launched = true;
-      void loadCommonsPhoto(visual.commonsQuery!).then(result => {
+      void loadCommonsPhoto(commonsQuery).then(result => {
         if (alive && result) setPhoto(result);
       });
     };
@@ -150,7 +153,7 @@ export function CarAttractionCover({ destination, landmark, className }: Props) 
       return () => { alive = false; observer.disconnect(); };
     }
     return () => { alive = false; };
-  }, [visual?.commonsQuery, destination]);
+  }, [commonsQuery, destination]);
 
   const cover = !imageFailed && photo ? photo.url : visual?.local ?? visual?.fallback ?? '';
   const isRealPhoto = Boolean(photo && !imageFailed);
@@ -164,7 +167,8 @@ export function CarAttractionCover({ destination, landmark, className }: Props) 
           <span aria-hidden="true">·</span>
           <a href={photo!.licenseUrl} target="_blank" rel="noopener noreferrer">{photo!.license}</a>
         </span>
-        : <span className="car-attraction-image-source car-attraction-ai-label" title="Kadr wygenerowany przez AI. Może nie odzwierciedlać dokładnego wyglądu obiektu.">Wizualizacja AI</span>}
+        : cover ? <span className="car-attraction-image-source car-attraction-ai-label" title="Kadr wygenerowany przez AI. Może nie odzwierciedlać dokładnego wyglądu obiektu.">Wizualizacja AI</span>
+        : <span className="car-attraction-image-source car-attraction-ai-label">Brak dostępnej fotografii</span>}
     </div>
   );
 }

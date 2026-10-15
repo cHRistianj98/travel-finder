@@ -35,19 +35,59 @@ public class CarTripProvider {
             if(roadKm<30 || roadKm>preferences.maxDistance()) continue;
             destinations.add(new Destination(attraction,roadKm));
         }
-        destinations.sort(Comparator.comparingInt((Destination d) -> d.km())
-                .thenComparing(Comparator.comparingInt((Destination d) -> d.attraction().interest()).reversed()));
-        int capPerWindow=Math.max(10, 90/Math.max(1, windows.size()));
+        // Nie wybieraj najpierw 90 najbliższych! W przeciwnym razie po rozbudowie katalogu
+        // miejscowości 600–1500 km NIGDY nie trafiłyby do wyników.
+        destinations.sort(Comparator.comparingDouble((Destination d) -> appealValue(d)).reversed()
+                .thenComparingInt(Destination::km));
+        int capPerWindow = Math.max(10, 120 / Math.max(1, windows.size()));
         for (LocalDate[] window : windows) {
-            int count=0;
+            List<List<Destination>> bands = new ArrayList<>();
+            for (int i=0;i<4;i++) bands.add(new ArrayList<>());
             for (Destination destination : destinations) {
-                if(count >= capPerWindow) break;
-                TripOption option=build(request,preferences,calendar,window,destination,quotes);
-                if(option!=null && option.price().compareTo(request.maxTransportBudget())<=0) {results.add(option);count++;}
+                int km = destination.km();
+                int band = km <= 220 ? 0 : km <= 500 ? 1 : km <= 900 ? 2 : 3;
+                bands.get(band).add(destination);
             }
+            List<TripOption> selected = new ArrayList<>();
+            Set<String> used = new HashSet<>();
+            Map<String,Integer> perCity = new HashMap<>();
+            int quota = Math.max(2, capPerWindow / 4);
+            for (List<Destination> band : bands) {
+                addCandidates(band, Math.min(capPerWindow, selected.size() + quota), request, preferences, calendar, window,
+                        quotes, selected, used, perCity);
+            }
+            // Krótszy maks. dystans albo zbyt drogie dalekie cele: wypełniamy
+            // wolne miejsca z innych przedziałów, nie pokazujemy pustej listy.
+            addCandidates(destinations, capPerWindow, request, preferences, calendar, window,
+                    quotes, selected, used, perCity);
+            results.addAll(selected);
         }
         return results.stream().limit(120).toList();
     }
+    private static double appealValue(Destination destination) {
+        var a = CarDestinationAppeal.forDestination(destination.attraction().destination());
+        double attractiveness = a == null ? (destination.attraction().interest() / 5d) : a.factor();
+        return attractiveness - .09 * destination.km() / 1500d;
+    }
+    private void addCandidates(List<Destination> choices, int wanted, TripSearchRequest request,
+            CarPreferences pref, AvailabilityCalendar calendar, LocalDate[] window,
+            Map<String,CarFuelPriceService.Quote> quotes, List<TripOption> selected,
+            Set<String> used, Map<String,Integer> perCity) {
+        for (Destination destination : choices) {
+            if (selected.size() >= wanted) break;
+            var place = destination.attraction();
+            String placeKey = CarAttractionCatalog.normalize(place.destination());
+            String cityKey = CarAttractionCatalog.normalize(place.country() + " " + place.city());
+            if (used.contains(placeKey) || perCity.getOrDefault(cityKey,0) >= 3) continue;
+            TripOption option = build(request,pref,calendar,window,destination,quotes);
+            if (option != null && option.price().compareTo(request.maxTransportBudget())<=0) {
+                selected.add(option);
+                used.add(placeKey);
+                perCity.merge(cityKey,1,Integer::sum);
+            }
+        }
+    }
+
     private TripOption build(TripSearchRequest request, CarPreferences pref, AvailabilityCalendar availability,
             LocalDate[] window, Destination place, Map<String,CarFuelPriceService.Quote> quotes) {
         long eachMinutes=(long)Math.ceil(place.km()/(place.km()<260 ? 62d : 72d)*60 + 20);
@@ -89,7 +129,8 @@ public class CarTripProvider {
                 ? "Uwzględniono ORIENTACYJNIE czeską winietę, choć trasa może omijać drogi płatne. LPG bez ulgi. Kurs CZK/PLN orientacyjny."
                 : "Bez winiety: trasa MUSI omijać czeskie płatne autostrady. Przed wyjazdem sprawdź trasę.")
                 : country.equals("DE") ? "W Niemczech brak ogólnej opłaty autostradowej dla standardowego auta osobowego; możliwe opłaty za parking/strefy/tunele."
-                : "Nie doliczono automatycznie płatnych odcinków A2/A4 ani parkingu konkretnego obiektu; można ustawić rezerwę.";
+                : country.equals("PL") ? "Nie doliczono automatycznie płatnych odcinków A2/A4 ani parkingu konkretnego obiektu; można ustawić rezerwę."
+                : "UWAGA: zagraniczna trasa może wymagać winiety, opłat autostradowych, tunelowych i miejskich. NIE są obliczone automatycznie; ustaw rezerwę w opłatach dodatkowych.";
         String fuelLabel=switch(pref.selectedFuel()){case PETROL->"Benzyna 95";case DIESEL->"Diesel";case LPG->"LPG";};
         CarTripDetails details=new CarTripDetails(place.attraction().landmark(),country,
                 CarAttractionCatalog.nearbyCount(place.attraction(),45),place.km(),roundKm,eachMinutes,

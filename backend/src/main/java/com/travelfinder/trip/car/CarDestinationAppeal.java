@@ -89,11 +89,19 @@ public final class CarDestinationAppeal {
             """;
 
     private static final Map<String, Integer> TIERS = parseRegionTiers();
-    private static final Map<String, Assessment> BY_DESTINATION = buildAssessments();
+    private static volatile Map<String, Assessment> assessments = Map.of();
+    private static volatile int assessedGeneration = -1;
 
     public static Assessment forDestination(String destination) {
         if (destination == null) return null;
-        return BY_DESTINATION.get(CarAttractionCatalog.normalize(destination));
+        if (assessedGeneration != CarAttractionCatalog.generation()) refresh();
+        return assessments.get(CarAttractionCatalog.normalize(destination));
+    }
+
+    public static synchronized void refresh() {
+        if (assessedGeneration == CarAttractionCatalog.generation()) return;
+        assessments = buildAssessments();
+        assessedGeneration = CarAttractionCatalog.generation();
     }
 
     private static Map<String, Integer> parseRegionTiers() {
@@ -112,37 +120,54 @@ public final class CarDestinationAppeal {
     private static Map<String, Assessment> buildAssessments() {
         List<CarAttractionCatalog.Attraction> all = CarAttractionCatalog.all();
         Map<String, Assessment> result = new HashMap<>();
+        // Siatka 0,2 stopnia ogranicza liczbę porównań dla kilku tysięcy miejsc.
+        Map<Long, List<CarAttractionCatalog.Attraction>> grid = new HashMap<>();
+        for (var a : all) grid.computeIfAbsent(cell(a.lat(), a.lon()), k -> new ArrayList<>()).add(a);
         for (CarAttractionCatalog.Attraction place : all) {
             int importance = Math.max(1, Math.min(5, place.interest()));
-            double localDensity = 0;
+            int latCell = (int) Math.floor(place.lat() * 5), lonCell = (int) Math.floor(place.lon() * 5);
+            double density = 0;
             int nearby = 0;
-            for (CarAttractionCatalog.Attraction other : all) {
-                if (place == other) continue;
-                double km = CarAttractionCatalog.distanceKm(place.lat(), place.lon(), other.lat(), other.lon());
-                // Maksymalnie 25 km; punkt 5 km od celu waży więcej niż punkt 22 km dalej.
-                if (km > 25) continue;
-                nearby++;
-                double quality = .35 + .65 * (Math.max(1, Math.min(5, other.interest())) - 1) / 4d;
-                localDensity += quality * Math.pow(.5, km / 9d);
+            Set<String> categories = new HashSet<>();
+            for (int di = -2; di <= 2; di++) for (int dj = -3; dj <= 3; dj++) {
+                for (var other : grid.getOrDefault(cellKey(latCell + di, lonCell + dj), List.of())) {
+                    if (place == other) continue;
+                    double km = CarAttractionCatalog.distanceKm(place.lat(), place.lon(), other.lat(), other.lon());
+                    if (km > 28 || km < .05) continue;
+                    nearby++;
+                    if (!other.category().isBlank()) categories.add(other.category());
+                    // Duże miasta nie mogą zgarniać 55 pkt przez 100 podobnych muzeów.
+                    double quality = .25 + .75 * Math.max(1, other.interest()) / 5d;
+                    density += quality * Math.pow(.5, km / 7d);
+                }
             }
-            double richness = Math.min(1, localDensity / 2.7);
             int weekendTier = TIERS.getOrDefault(CarAttractionCatalog.normalize(place.city()),
-                    Math.max(1, Math.min(5, (int) Math.round(2 + localDensity * 1.15))));
-            // Wybitny punkt nie wystarcza sam w sobie na 3-dniowy pobyt; oceniamy też region.
-            double landmark = (importance - 1) / 4d;
-            double region = (weekendTier - 1) / 4d;
-            double factor = Math.min(1, .08 + .40 * landmark + .34 * region + .18 * richness);
-            String explanation = "Ranga głównej atrakcji " + importance + "/5 (katalog redakcyjny), "
-                    + "potencjał weekendowy regionu " + weekendTier + "/5, "
-                    + nearby + " innych punktów katalogu do ~25 km, z premią za bliskość i znaczenie. "
-                    + "To heurystyka turystyczna, a nie oceny odwiedzających; nie uwzględnia pogody, "
-                    + "godzin otwarcia ani wszystkich atrakcji danego regionu.";
-            Assessment assessment = new Assessment(factor, importance, weekendTier, nearby, explanation);
-            String key = CarAttractionCatalog.normalize(place.destination());
-            if (result.putIfAbsent(key, assessment) != null) {
-                throw new IllegalStateException("Powtórzona nazwa celu samochodowego: " + place.destination());
-            }
+                    Math.max(1, Math.min(5, (int) Math.round(1.7 + Math.log1p(density) * 1.25))));
+            // 0–55 pkt: ranga obiektu 0–32, region 0–14, różnorodność i bliskość 0–9.
+            // Obiekty importowane: ich znaczenie zależy od typu i jawnych tagów OSM
+            // (Wikidata/Wikipedia/zabytek), a nie od bezpodstawnie założonego 5/5.
+            int qualityPoints = place.source().equals("EDITORIAL")
+                    ? Math.min(32, switch (importance) { case 1 -> 6; case 2 -> 10; case 3 -> 16; case 4 -> 24; default -> 31; })
+                    : Math.min(32, Math.max(0, place.sourceQuality()));
+            int regionPoints = (int) Math.round((weekendTier - 1) * 3.5);
+            int nearbyPoints = (int) Math.round(9 * Math.min(1,
+                    .75 * Math.min(1, density / 5d) + .25 * Math.min(1, categories.size() / 4d)));
+            int attraction55 = Math.max(0, Math.min(55, qualityPoints + regionPoints + nearbyPoints));
+            String explanation = "Atrakcyjność turystyczna " + attraction55 + "/55 pkt: ranga obiektu "
+                    + qualityPoints + "/32, potencjał weekendowy regionu " + regionPoints
+                    + "/14, pobliskie miejsca i różnorodność " + nearbyPoints + "/9 ("
+                    + nearby + " innych punktów w promieniu ~28 km). Źródło: "
+                    + (place.source().equals("EDITORIAL") ? "katalog redakcyjny" : "OpenStreetMap, ocena heurystyczna na podstawie tagów")
+                    + ". Nie są to oceny odwiedzających; brak gwarancji dostępności i godzin otwarcia.";
+            Assessment assessment = new Assessment(attraction55 / 55d, importance, weekendTier, nearby, explanation);
+            result.putIfAbsent(CarAttractionCatalog.normalize(place.destination()), assessment);
         }
         return Map.copyOf(result);
     }
+
+    private static long cell(double lat, double lon) {
+        return cellKey((int) Math.floor(lat * 5), (int) Math.floor(lon * 5));
+    }
+    private static long cellKey(int a, int b) { return ((long) a << 32) | (b & 0xffffffffL); }
+
 }

@@ -45,9 +45,26 @@ export function TripSearchForm({ onSearch, loading, trainAccess, busAccess }: Pr
     car: {
       fuel: 'PETROL', litresPer100Km: 7.2, passengers: 1,
       parkingPlnPerDay: 30, additionalTollsPln: 0,
-      useCzechMotorways: true, fuelPriceOverridePln: null, maxOneWayKm: 750,
+      useCzechMotorways: true, fuelPriceOverridePln: null, maxOneWayKm: 1500,
     },
   }));
+  const [catalogStatus, setCatalogStatus] = useState<null | {
+    editorial: number; imported: number; total: number; target: number;
+    syncing: boolean; message: string; attribution: string;
+  }>(null);
+  useEffect(() => {
+    if (!form.transportTypes.includes('CAR')) return;
+    const controller = new AbortController();
+    const refresh = () => {
+      fetch('/api/car-attractions/status', {signal: controller.signal})
+        .then(res => res.ok ? res.json() : Promise.reject(new Error('status')))
+        .then(data => {if (!controller.signal.aborted) setCatalogStatus(data);})
+        .catch(() => {if (!controller.signal.aborted) setCatalogStatus(null);});
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 12000);
+    return () => {controller.abort(); window.clearInterval(timer);};
+  }, [form.transportTypes.includes('CAR')]);
   const [validationError, setValidationError] = useState<string | null>(null);
   const freeDays = form.availableDates.length;
   const datePairs = countPossiblePairs(form.availableDates);
@@ -274,6 +291,13 @@ export function TripSearchForm({ onSearch, loading, trainAccess, busAccess }: Pr
         </div>
         {form.transportTypes.includes('CAR') && form.car && <div className="car-config">
           <div className="car-config-heading"><Icon name="car" size={18}/><div><strong>Ustaw swój samochód</strong><small>Obliczamy koszt całego auta i cenę na osobę, bez płatnego API.</small></div></div>
+          <div className="availability-hint" aria-live="polite">
+            <Icon name="map-pin" size={15}/>
+            <span>{catalogStatus
+              ? `${catalogStatus.total} atrakcji w katalogu (${catalogStatus.imported} OpenStreetMap + ${catalogStatus.editorial} redakcyjnych). ${catalogStatus.syncing ? 'Trwa uzupełnianie w tle…' : catalogStatus.imported < 1001 ? 'Import jeszcze nie osiągnął 1000 nowych punktów.' : 'Katalog rozszerzony jest gotowy.'}`
+              : 'Katalog zawiera miejsca redakcyjne. Uruchom backend, aby sprawdzić status importu z OpenStreetMap.'}
+            </span>
+          </div>
           <div className="car-config-fields">
             <label>Rodzaj paliwa
               <select value={form.car.fuel} onChange={event => changeFuel(event.target.value as CarFuel)}>
@@ -300,6 +324,7 @@ export function TripSearchForm({ onSearch, loading, trainAccess, busAccess }: Pr
             </label>
           </div>
           <label className="car-config-vignette"><input type="checkbox" checked={form.car.useCzechMotorways} onChange={e=>updateCar('useCzechMotorways',e.target.checked)}/><span>Uwzględnij czeską winietę autostradową (orientacyjnie)</span></label>
+          {catalogStatus && <p><Icon name="info" size={14}/>{catalogStatus.message}. Dane © OpenStreetMap contributors, ODbL 1.0. Oceny 0–55 są heurystyczne, nie są ocenami użytkowników. Nowe punkty pojawią się po zakończeniu importu i ponownym wyszukaniu.</p>}
           <p><Icon name="info" size={14}/> Dystans i czas: szacunek drogowy, nie dane nawigacji. Parking: rezerwa, nie aktualny cennik. Benzyna i diesel: bezpłatne notowania tygodniowe, jeśli dostępne; LPG może korzystać z jawnego założenia. Czeska winieta: domyślnie dla celów w Czechach, nawet jeśli istnieje droga bezpłatna.</p>
         </div>}
         {trainAccess !== 'active' && <div className="plk-waiting-notice" role="status">

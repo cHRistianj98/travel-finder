@@ -13,7 +13,7 @@ public record CarPreferences(Fuel fuel, Double litresPer100Km, Integer passenger
     public double parkingDaily() { return parkingPlnPerDay == null ? 30 : parkingPlnPerDay; }
     public double tolls() { return additionalTollsPln == null ? 0 : additionalTollsPln; }
     public boolean vignette() { return useCzechMotorways == null || useCzechMotorways; }
-    public int maxDistance() { return maxOneWayKm == null ? 750 : maxOneWayKm; }
+    public int maxDistance() { return maxOneWayKm == null ? 1500 : maxOneWayKm; }
     public void validate() {
         if (!(consumption() >= 2 && consumption() <= 30) || !Double.isFinite(consumption())) throw new IllegalArgumentException("Spalanie musi wynosić 2–30 l/100 km.");
         if (people() < 1 || people() > 9) throw new IllegalArgumentException("Podaj od 1 do 9 osób w samochodzie.");

@@ -2,8 +2,8 @@ package com.travelfinder.trip.car;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URI;
@@ -27,6 +27,9 @@ public class CarFuelPriceService {
     private final HttpClient client;
     private final ObjectMapper mapper;
     private final Map<String,Cached> cache = new ConcurrentHashMap<>();
+    // Awaria NBP / notowań nie może oznaczać 3 sekund oczekiwania za każdym razem
+    // dla 12–15 krajów widocznych w rozszerzonym katalogu atrakcji.
+    private volatile Instant remoteRetryAfter = Instant.EPOCH;
     @Autowired
     public CarFuelPriceService(ObjectMapper mapper) {
         this(mapper, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build());
@@ -44,6 +47,7 @@ public class CarFuelPriceService {
     }
     private Quote load(String country, CarPreferences.Fuel fuel) {
         if (fuel == CarPreferences.Fuel.LPG && !"CZ".equals(country)) return fallback(country, fuel);
+        if (Instant.now().isBefore(remoteRetryAfter)) return fallback(country, fuel);
         try {
             BigDecimal euroPln = euroPln();
             if ("CZ".equals(country)) {
@@ -75,7 +79,9 @@ public class CarFuelPriceService {
                     }
                 }
             }
-        } catch (Exception ignored) { /* Awaria/limit sieci nie blokuje wyjazdów. */ }
+        } catch (Exception ignored) {
+            remoteRetryAfter = Instant.now().plus(Duration.ofMinutes(10));
+        }
         return fallback(country, fuel);
     }
     private boolean validDate(String date) {
@@ -106,6 +112,10 @@ public class CarFuelPriceService {
         double value = switch (country) {
             case "DE" -> switch (fuel) { case PETROL -> 8.20; case DIESEL -> 7.70; case LPG -> 4.10; };
             case "CZ" -> switch (fuel) { case PETROL -> 7.90; case DIESEL -> 7.40; case LPG -> 3.90; };
+            case "AT", "SI", "SK", "HU" -> switch (fuel) { case PETROL -> 7.40; case DIESEL -> 7.20; case LPG -> 4.10; };
+            case "IT", "FR", "CH", "NL", "BE", "DK" -> switch (fuel) { case PETROL -> 8.70; case DIESEL -> 8.10; case LPG -> 4.50; };
+            case "HR" -> switch (fuel) { case PETROL -> 7.40; case DIESEL -> 7.20; case LPG -> 4.10; };
+            case "LT" -> switch (fuel) { case PETROL -> 7.00; case DIESEL -> 7.20; case LPG -> 3.90; };
             default -> switch (fuel) { case PETROL -> 6.80; case DIESEL -> 6.90; case LPG -> 3.40; };
         };
         return new Quote(BigDecimal.valueOf(value).setScale(2),"ZAŁOŻENIE PLANISTYCZNE — zmień cenę w formularzu", "brak aktualnego odczytu",false);
