@@ -3,6 +3,7 @@ package com.travelfinder.trip.car;
 import com.travelfinder.trip.domain.*;
 import com.travelfinder.trip.scoring.TravelDestinationCatalog;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URLEncoder;
@@ -15,7 +16,13 @@ import java.util.*;
 public class CarTripProvider {
     private static final ZoneId ZONE=ZoneId.of("Europe/Warsaw");
     private final CarFuelPriceService prices;
-    public CarTripProvider(CarFuelPriceService prices) { this.prices=prices; }
+    private final CarRoadRoutingService routing;
+    @Autowired
+    public CarTripProvider(CarFuelPriceService prices, CarRoadRoutingService routing) {
+        this.prices=prices; this.routing=routing;
+    }
+    // Dotychczasowe testy jednostkowe: bez dostępu do sieci korzystają z jawnych szacunków.
+    CarTripProvider(CarFuelPriceService prices) { this(prices,null); }
     public List<TripOption> search(TripSearchRequest request) {
         CarPreferences preferences=request.car()==null ? new CarPreferences(null,null,null,null,null,null,null,null) : request.car();
         preferences.validate();
@@ -30,14 +37,40 @@ public class CarTripProvider {
         List<Destination> destinations=new ArrayList<>();
         for (CarAttractionCatalog.Attraction attraction : CarAttractionCatalog.all()) {
             double straight = CarAttractionCatalog.distanceKm(origin.lat(),origin.lon(),attraction.lat(),attraction.lon());
-            // Haversine × faktor dróg (szacunek, nie API nawigacji). Górskie cele mają zwykle krętsze drogi.
-            int roadKm=(int)Math.ceil(straight * (straight<140 ? 1.38 : straight<380 ? 1.30 : 1.25) + 8);
-            if(roadKm<30 || roadKm>preferences.maxDistance()) continue;
-            destinations.add(new Destination(attraction,roadKm));
+            // Jedyny twardy warunek wstępny: droga nigdy nie jest krótsza od linii prostej.
+            // Nie wyrzucamy np. celu 290 km dlatego, że mnożnik przewidział 310 km.
+            if (straight > preferences.maxDistance() || straight < 5) continue;
+            int approximate=(int)Math.ceil(straight * (straight<140 ? 1.38 : straight<380 ? 1.30 : 1.25)+8);
+            destinations.add(new Destination(attraction,approximate,estimatedMinutes(approximate),false));
         }
-        // Nie wybieraj najpierw 90 najbliższych! W przeciwnym razie po rozbudowie katalogu
-        // miejscowości 600–1500 km NIGDY nie trafiłyby do wyników.
         destinations.sort(Comparator.comparingDouble((Destination d) -> appealValue(d)).reversed()
+                .thenComparingInt(Destination::km));
+        // Rozmaite promienie zamiast 130 najbliższych. OSRM Table 1→N mierzy wiele tras
+        // jednym żądaniem, więc nie zasypujemy serwera 1000 pojedynczych requestów.
+        List<List<Destination>> candidatesByBand = new ArrayList<>();
+        for (int i=0;i<4;i++) candidatesByBand.add(new ArrayList<>());
+        Map<String,Integer> preliminaryCityCounts=new HashMap<>();
+        for (Destination d : destinations) {
+            int band=band(d.km());
+            String city=CarAttractionCatalog.normalize(d.attraction().country()+" "+d.attraction().city());
+            if (candidatesByBand.get(band).size()>=36 || preliminaryCityCounts.getOrDefault(city,0)>=6) continue;
+            candidatesByBand.get(band).add(d);
+            preliminaryCityCounts.merge(city,1,Integer::sum);
+        }
+        List<Destination> shortList = new ArrayList<>();
+        for (List<Destination> band : candidatesByBand) shortList.addAll(band);
+        Map<CarAttractionCatalog.Attraction,CarRoadRoutingService.Road> roadMap = routing == null ? Map.of()
+                : routing.roads(origin.lat(), origin.lon(),shortList.stream().map(Destination::attraction).toList());
+        Map<String,Destination> byPlace = new HashMap<>();
+        for (Destination d : shortList) {
+            var road=roadMap.get(d.attraction());
+            Destination updated = road == null ? d : new Destination(d.attraction(),road.km(),road.minutes(),true);
+            // Ostateczny filtr MAX KM bazuje na faktycznej trasie, jeśli została znaleziona.
+            if (updated.km() >= 30 && updated.km() <= preferences.maxDistance())
+                byPlace.put(CarAttractionCatalog.normalize(updated.attraction().destination()),updated);
+        }
+        destinations = new ArrayList<>(byPlace.values());
+        destinations.sort(Comparator.comparingDouble((Destination d)->appealValue(d)).reversed()
                 .thenComparingInt(Destination::km));
         int capPerWindow = Math.max(10, 120 / Math.max(1, windows.size()));
         for (LocalDate[] window : windows) {
@@ -45,7 +78,7 @@ public class CarTripProvider {
             for (int i=0;i<4;i++) bands.add(new ArrayList<>());
             for (Destination destination : destinations) {
                 int km = destination.km();
-                int band = km <= 220 ? 0 : km <= 500 ? 1 : km <= 900 ? 2 : 3;
+                int band = band(km);
                 bands.get(band).add(destination);
             }
             List<TripOption> selected = new ArrayList<>();
@@ -63,6 +96,11 @@ public class CarTripProvider {
             results.addAll(selected);
         }
         return results.stream().limit(120).toList();
+    }
+    private static int band(int km) { return km<=220?0:km<=500?1:km<=900?2:3; }
+    private static long estimatedMinutes(int km) {
+        // Fallback wyłącznie na wypadek awarii/niedostępności routingu.
+        return (long)Math.ceil(km/(km<260?62d:72d)*60+20);
     }
     private static double appealValue(Destination destination) {
         var a = CarDestinationAppeal.forDestination(destination.attraction().destination());
@@ -90,7 +128,7 @@ public class CarTripProvider {
 
     private TripOption build(TripSearchRequest request, CarPreferences pref, AvailabilityCalendar availability,
             LocalDate[] window, Destination place, Map<String,CarFuelPriceService.Quote> quotes) {
-        long eachMinutes=(long)Math.ceil(place.km()/(place.km()<260 ? 62d : 72d)*60 + 20);
+        long eachMinutes=place.drivingMinutes();
         LocalDate departureDay=window[0], returnDay=window[1];
         // Własnym autem wyjazd o dowolnej godzinie W WYBRANYM oknie, ale unikamy niepotrzebnie późnego startu.
         LocalTime dep=clampTime(LocalTime.of(7,0),request.earliestOutboundDeparture(),request.latestOutboundDeparture());
@@ -135,9 +173,10 @@ public class CarTripProvider {
         CarTripDetails details=new CarTripDetails(place.attraction().landmark(),country,
                 CarAttractionCatalog.nearbyCount(place.attraction(),45),place.km(),roundKm,eachMinutes,
                 pref.people(),pref.consumption(),fuelLabel,litre,priceSource,priceDate,fuelCost,
-                vignette,parking,extra,total,true,tollNotice);
+                vignette,parking,extra,total,!place.routed(),tollNotice);
+        double[] destinationAccess = CarRoadRoutingService.roadAccess(place.attraction());
         String maps="https://www.google.com/maps/dir/?api=1&origin="+enc(request.origin()+", Polska")
-                +"&destination="+enc(place.attraction().lat()+","+place.attraction().lon())+"&travelmode=driving";
+                +"&destination="+enc(destinationAccess[0]+","+destinationAccess[1])+"&travelmode=driving";
         UUID id=UUID.nameUUIDFromBytes((request.origin()+"|"+place.attraction().destination()+"|"+departure+"|"+home+"|"+pref.selectedFuel()).getBytes(StandardCharsets.UTF_8));
         long stay=Duration.between(arrival,back).toMinutes();
         return new TripOption(id,request.origin(),place.attraction().destination(),
@@ -174,5 +213,5 @@ public class CarTripProvider {
     }
     private static String enc(String input){return URLEncoder.encode(input,StandardCharsets.UTF_8);}
     private static BigDecimal money(double value){return BigDecimal.valueOf(value).setScale(2,RoundingMode.HALF_UP);}
-    private record Destination(CarAttractionCatalog.Attraction attraction,int km){}
+    private record Destination(CarAttractionCatalog.Attraction attraction,int km,long drivingMinutes,boolean routed){}
 }

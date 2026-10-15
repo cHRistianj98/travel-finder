@@ -167,8 +167,8 @@ export function TripResultCard({ trip, index, score }: { trip: TripOption; index
           <span className={`trip-fact trip-fact-${TRANSPORT_THEMES[trip.transportType]}`}><Icon name={allDirect ? 'check' : 'route'} size={15} /> {isCar ? 'Elastyczne godziny' : allDirect ? 'Bez przesiadek' : 'Z przesiadką'}</span>
         </div>
         {isCar && car && <div className="car-summary">
-          <div><Icon name="route" size={15}/><strong>~{car.oneWayKm} km</strong><small>w jedną stronę</small></div>
-          <div><Icon name="clock" size={15}/><strong>~{durationLabel(car.drivingMinutesEachWay)}</strong><small>za kierownicą / strona</small></div>
+          <div><Icon name="route" size={15}/><strong>~{car.oneWayKm} km</strong><small>{car.roadEstimate ? 'szacunek / strona' : 'trasa OSRM / strona'}</small></div>
+          <div><Icon name="clock" size={15}/><strong>~{durationLabel(car.drivingMinutesEachWay)}</strong><small>{car.roadEstimate ? 'czas szacunkowy' : 'czas z rezerwą / strona'}</small></div>
           <div><Icon name="compass" size={15}/><strong>{car.nearbyAttractions}</strong><small>atrakcji w okolicy</small></div>
         </div>}
         {isBus && <div className="bus-search-actions" aria-label="Wyszukaj autobusy we FlixBusie">
@@ -207,7 +207,7 @@ export function TripResultCard({ trip, index, score }: { trip: TripOption; index
             <div className="detail-line car-total"><span>Całe auto / na osobę</span><strong>{formatPrice(car.totalCarCostPln)} / {formatPrice(trip.price ?? 0)}</strong></div>
             <p>Źródło paliwa: {car.fuelPriceSource}. Data: {car.fuelPriceDate}. <a href="https://www.fuel-prices.eu/" target="_blank" rel="noopener noreferrer">Dane fuel-prices.eu (CC BY 4.0)</a>.</p>
             <p>{car.tollNotice}</p>
-            <p>Dystans i czas przejazdu są przybliżone. Nie uwzględniają konkretnej trasy, korków ani aktualnych opłat parkingowych.</p>
+            <p>{car.roadEstimate ? 'Nie udało się sprawdzić przebiegu trasy — dystans i czas są szacowane geometrycznie. Zweryfikuj je w Google Maps.' : <>Trasa liczona po drogach przez <a href="https://routing.openstreetmap.de/about.html" target="_blank" rel="noopener noreferrer">OSRM</a> na danych <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap (ODbL)</a>. Czas obejmuje rezerwę na dojazd i krótkie postoje; nie jest prognozą korków na wybraną godzinę. Przy szlakach górskich dojazd dotyczy okolicy punktu startowego, nie samego szczytu.</>}</p>
           </div>}
           {score && <div className="travel-score-detail">
             <div className="travel-score-detail-heading"><Icon name="sparkles" size={15}/> Skąd wynik {score.value}/100?
