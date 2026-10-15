@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon, type IconName } from '../../components/Icon';
 import { resolveDestinationMeta } from './destinationVisuals';
+import { CarAttractionCover } from './CarAttractionCover';
 import { flixBusDateSummary, flixBusSearchLink } from './flixBusBooking';
 import { fetchFlixBusPreview, type FlixBusPublicPreview } from './flixBusPreview';
 import type { TravelScore } from './travelScore';
@@ -83,11 +84,13 @@ export function TripResultCard({ trip, index, score }: { trip: TripOption; index
   return (
     <article ref={cardRef} className={`trip-card palette-${meta.palette} ${themeClass}`} style={{ animationDelay: `${index * 70}ms` }}>
       <div className="trip-cover">
-        {meta.image ? (
-          <img src={meta.image} alt={`${displayDestination} – ilustracja kierunku, niekoniecznie wybranej atrakcji`} loading="lazy" />
+        {isCar && car ? (
+          <CarAttractionCover key={trip.destination} destination={trip.destination} landmark={car.landmark} />
+        ) : meta.image ? (
+          <img src={meta.image} alt={`${displayDestination} – wizualizacja AI kierunku`} loading="lazy" />
         ) : (
           <div className="trip-cover-placeholder" aria-hidden="true">
-            <Icon name={isTrain ? 'train' : isBus ? 'bus' : isCar ? 'car' : 'plane'} size={74} strokeWidth={1} />
+            <Icon name={isTrain ? 'train' : isBus ? 'bus' : 'plane'} size={74} strokeWidth={1} />
           </div>
         )}
         <div className="trip-cover-overlay" />
@@ -122,7 +125,7 @@ export function TripResultCard({ trip, index, score }: { trip: TripOption; index
             <span style={{ width: `${score.value}%` }} />
           </div>
           <div className="travel-score-summary-sub">
-            {score.strengths[0] || 'Ocena na podstawie dostępnych parametrów'}
+            {(isCar && score.cautions.find(text => text.startsWith('Miejsce raczej na krótką wycieczkę'))) || score.strengths[0] || 'Ocena na podstawie dostępnych parametrów'}
             {score.partial && <span>· Dane: {score.availablePoints}/100 pkt</span>}
           </div>
         </div>}
@@ -189,7 +192,8 @@ export function TripResultCard({ trip, index, score }: { trip: TripOption; index
           <div className="detail-line"><span>Łącznie w podróży</span><strong>{durationLabel(trip.totalTravelDurationMinutes)}</strong></div>
           {landmark && <div className="detail-line"><span>Cel wycieczki</span><strong>{landmark}</strong></div>}
           {!isCar && trip.destination !== displayDestination && <div className="detail-line"><span>Przystanek docelowy w źródle</span><strong>{trip.destination}</strong></div>}
-          {meta.image && <div className="live-detail-note"><Icon name="info" size={14} /> Obraz na karcie to wizualizacja AI i może pokazywać inny punkt miejscowości niż cel wycieczki.</div>}
+          {isCar ? <div className="live-detail-note"><Icon name="info" size={14} /> Obraz atrakcji: lokalna wizualizacja AI albo fotografia Wikimedia Commons z podanym autorem i licencją. Ujęcia AI są poglądowe i mogą różnić się od rzeczywistego obiektu.</div>
+            : meta.image && <div className="live-detail-note"><Icon name="info" size={14} /> Obraz na karcie to wizualizacja AI i może pokazywać inny punkt miejscowości niż cel wycieczki.</div>}
           <div className="detail-line"><span>Przesiadki tam / powrót</span><strong>{trip.outboundTransfers} / {trip.returnTransfers}</strong></div>
           {isCar && car && <div className="car-price-details">
             <strong><Icon name="car" size={17}/> Kalkulacja kosztu samochodu (szacunkowa)</strong>

@@ -1,6 +1,7 @@
 package com.travelfinder.trip.scoring;
 
 import com.travelfinder.trip.domain.TripOption;
+import com.travelfinder.trip.car.CarDestinationAppeal;
 import com.travelfinder.trip.domain.TripSearchRequest;
 import com.travelfinder.trip.scoring.TravelScoreProfile.Criterion;
 import org.springframework.stereotype.Service;
@@ -63,13 +64,13 @@ public class TravelScoringService {
 
         BigDecimal budget = request.maxTransportBudget();
         if (trip.price() == null || budget == null || budget.signum() <= 0 || !"PLN".equalsIgnoreCase(trip.currency())) {
-            add(criteria, profile, Criterion.PRICE, null,
+            add(criteria, profile, isCar, Criterion.PRICE, null,
                     "Brak wiarygodnej ceny za konkretną podróż. Minimum «od» FlixBusa nie jest ceną tych kursów.");
             cautions.add("Cena wybranych kursów jest nieznana");
         } else {
             double ratio = trip.price().doubleValue() / budget.doubleValue();
             double priceScore = clamp(0.24 + 0.76 * (1 - Math.min(1, Math.max(0, ratio))), 0, 1) * (isCar ? .90 : 1);
-            add(criteria, profile, Criterion.PRICE, priceScore,
+            add(criteria, profile, isCar, Criterion.PRICE, priceScore,
                     (isCar ? "SZACUNKOWY koszt samochodu NA OSOBĘ: " : "Cena z oferty: ") + money(trip.price())
                             + " / limit " + money(budget) + ". "
                             + (isCar ? "Paliwo, parking i ewentualna winieta to planistyczne założenia; nie oferta ani rzeczywista opłata." : "Dla lotów może być historyczna."));
@@ -80,7 +81,7 @@ public class TravelScoringService {
         double actualStayHours = Math.max(0, trip.timeAtDestinationMinutes() / 60d);
         // Dodatkowe dni po przekroczeniu ~3 dób nie powinny nieograniczenie dominować rankingu.
         double stayScore = clamp(0.65 * Math.min(stayDaylight / 28d, 1) + 0.35 * Math.min(actualStayHours / 66, 1), 0, 1);
-        add(criteria, profile, Criterion.STAY, stayScore,
+        add(criteria, profile, isCar, Criterion.STAY, stayScore,
                 formatHours(trip.timeAtDestinationMinutes()) + " na miejscu, w tym około " + stayDaylight + " godz. między 9:00 a 21:00 (szacunek czasu dziennego).");
         if (stayDaylight >= 20) strengths.add("Dużo czasu dziennego na miejscu");
         if (stayDaylight < 8) cautions.add("Niewiele godzin dziennych na miejscu");
@@ -88,7 +89,7 @@ public class TravelScoringService {
         double daysScore = availableDaytimeMinutes > 0
                 ? (double) freeDaytimeMinutes / availableDaytimeMinutes
                 : (tripDays > 0 ? (double) daysOff / tripDays : 0);
-        add(criteria, profile, Criterion.DAYS_OFF, daysScore,
+        add(criteria, profile, isCar, Criterion.DAYS_OFF, daysScore,
                 daysOff + " z " + tripDays + " dni zahacza o weekend lub polskie święto; "
                         + Math.round(daysScore * 100) + "% dostępnych godzin 9:00–21:00 przypada na takie dni. Zakładamy standardowy tydzień pracy.");
         if (tripDays > 0 && daysOff >= 2) strengths.add("Wykorzystuje weekend lub dni wolne");
@@ -99,7 +100,7 @@ public class TravelScoringService {
         double timeFactor = clamp(1 - Math.max(0, transportHours - 3) / 20, .15, 1);
         double comfortFactor = isCar ? clamp(.40 + .60 * timeFactor - Math.max(0, transportHours - 8) * .035, .05, 1)
                 : .70 * changeFactor + .30 * timeFactor;
-        add(criteria, profile, Criterion.COMFORT, comfortFactor,
+        add(criteria, profile, isCar, Criterion.COMFORT, comfortFactor,
                 (isCar ? "Samodzielna jazda: " + formatHours(trip.totalTravelDurationMinutes()) + " za kierownicą w obie strony. Długie przejazdy męczą kierowcę."
                         : transfers + " przesiadek łącznie; " + formatHours(trip.totalTravelDurationMinutes()) + " w trasie. Komfort to heurystyka, nie ocena siedzeń i bagażu."));
         if (isCar) {
@@ -119,7 +120,7 @@ public class TravelScoringService {
         double timing = .40 * comfortHour(arrival, 9, 20) + .25 * comfortHour(returnDeparture, 8, 22)
                 + .20 * comfortHour(arrivalHome, 7, 23) + .15 * comfortHour(outboundHome, 6, 23);
         if (isCar) timing = Math.min(1, .68 + .32 * timing); // Premia za elastyczne terminy i postoje.
-        add(criteria, profile, Criterion.SCHEDULE, timing,
+        add(criteria, profile, isCar, Criterion.SCHEDULE, timing,
                 (isCar ? "Orientacyjne godziny samochodem (wybór kierowcy w dozwolonych przedziałach); " : "") + "Przyjazd na miejsce " + trip.outboundArrival().toLocalTime().withSecond(0)
                         + ", wyjazd powrotny " + trip.returnDeparture().toLocalTime().withSecond(0)
                         + ", powrót do domu " + trip.returnArrival().toLocalTime().withSecond(0) + ".");
@@ -127,25 +128,38 @@ public class TravelScoringService {
         if (arrivalHome >= 23 || arrivalHome < 5) cautions.add("Późny powrót do domu");
 
         if (distanceKm == null) {
-            add(criteria, profile, Criterion.DISTANCE, null, "Brak wiarygodnego położenia miasta w lokalnym katalogu.");
+            add(criteria, profile, isCar, Criterion.DISTANCE, null, "Brak wiarygodnego położenia miasta w lokalnym katalogu.");
         } else {
             // Preferencja relatywnie bliskich wypadów, nie twierdzenie o dojeździe z lotniska.
             double closeness = isCar ? clamp(1 - Math.max(0, distanceKm - 70) / 750d, .08, 1)
                     : clamp(1 - Math.max(0, distanceKm - 100) / 3100d, .12, 1);
-            add(criteria, profile, Criterion.DISTANCE, closeness,
+            add(criteria, profile, isCar, Criterion.DISTANCE, closeness,
                     isCar ? "Szacunkowo " + distanceKm + " km w JEDNĄ stronę drogami (Haversine × współczynnik). To NIE jest dystans wyznaczony przez nawigację."
                             : "Około " + distanceKm + " km w linii prostej między centrami miast. NIE uwzględnia transferu z lotniska/dworca.");
         }
 
         List<String> attractions = isCar ? List.of(car.landmark()) : place == null ? List.of() : place.highlights();
-        if (attractions.isEmpty()) {
-            add(criteria, profile, Criterion.ATTRACTIONS, null, "Brak tego miasta w redakcyjnym katalogu atrakcji.");
+        if (isCar) {
+            var appeal = CarDestinationAppeal.forDestination(trip.destination());
+            if (appeal == null) {
+                add(criteria, profile, true, Criterion.ATTRACTIONS, null,
+                        "Brak oceny tej konkretnej atrakcji w katalogu; nie przyznajemy losowych punktów.");
+                cautions.add("Brak redakcyjnej oceny atrakcyjności celu");
+            } else {
+                add(criteria, profile, true, Criterion.ATTRACTIONS, appeal.factor(), appeal.explanation());
+                if (appeal.regionWeekendPotential() >= 4 && appeal.landmarkImportance() >= 4)
+                    strengths.add(0, "Ciekawy region na cały weekend");
+                else if (appeal.regionWeekendPotential() <= 2 && trip.timeAtDestinationMinutes() >= 24 * 60)
+                    cautions.add(0, "Miejsce raczej na krótką wycieczkę niż cały weekend");
+            }
+        } else if (attractions.isEmpty()) {
+            add(criteria, profile, false, Criterion.ATTRACTIONS, null, "Brak tego miasta w redakcyjnym katalogu atrakcji.");
         } else {
-            double value = isCar ? Math.min(1, .22 + .15 * car.nearbyAttractions()) : Math.min(1, attractions.size() / 4d);
-            add(criteria, profile, Criterion.ATTRACTIONS, value,
-                    (isCar ? car.nearbyAttractions() + " punkty turystyczne w promieniu ~45 km w katalogu (w tym wybrany cel): " : attractions.size() + " przykłady atrakcji w naszym katalogu, nie całkowita liczba atrakcji miasta: ") + ""
+            double value = Math.min(1, attractions.size() / 4d);
+            add(criteria, profile, false, Criterion.ATTRACTIONS, value,
+                    attractions.size() + " przykłady atrakcji w naszym katalogu, nie całkowita liczba atrakcji miasta: "
                             + String.join(", ", attractions.stream().limit(4).toList()) + ".");
-            if (isCar ? car.nearbyAttractions() >= 4 : attractions.size() >= 4) strengths.add("Bogaty wybór atrakcji w katalogu");
+            if (attractions.size() >= 4) strengths.add("Bogaty wybór atrakcji w katalogu");
         }
 
         boolean transportMatches = request.transportTypes() != null && request.transportTypes().contains(trip.transportType());
@@ -155,7 +169,7 @@ public class TravelScoringService {
         boolean returnInWindow = inRange(trip.returnDeparture().toLocalTime(), request.earliestReturnDeparture(), request.latestReturnDeparture());
         double match = (transportMatches ? .30 : 0) + (directMatches ? .25 : 0) + (budgetMatches ? .15 : 0)
                 + (departureInWindow ? .15 : 0) + (returnInWindow ? .15 : 0);
-        add(criteria, profile, Criterion.MATCH, match,
+        add(criteria, profile, isCar, Criterion.MATCH, match,
                 "Transport, budżet (gdy cena znana), bezpośredniość i oba przedziały godzin. Wymagania obowiązkowe nadal filtruje wyszukiwarka.");
 
         double confidence = isCar ? .40 : trip.price() == null ? .30 : .52;
@@ -163,7 +177,7 @@ public class TravelScoringService {
                 ? "SAMOCHÓD: brak potwierdzonej nawigacji i aktualnych stawek parkingowych/opłat drogowych. Koszt, dystans i czas to szacunki; źródło paliwa: " + car.fuelPriceSource() + "."
                 : "Planowe GTFS/PLK lub historyczne cache nie potwierdzają dostępności miejsca na wybrany kurs.";
         if (trip.price() == null) confidenceDetail += " Brak ceny dokładnej podróży.";
-        add(criteria, profile, Criterion.CONFIDENCE, confidence, confidenceDetail);
+        add(criteria, profile, isCar, Criterion.CONFIDENCE, confidence, confidenceDetail);
 
         int value = 0, available = 0;
         for (CriterionResult item : criteria) {
@@ -175,11 +189,14 @@ public class TravelScoringService {
                 stayDaylight, attractions.stream().limit(4).toList());
     }
 
-    private static void add(List<CriterionResult> target, TravelScoreProfile profile,
+    private static void add(List<CriterionResult> target, TravelScoreProfile profile, boolean isCar,
             Criterion criterion, Double factor, String detail) {
         String[] names = {"Cena", "Czas na miejscu", "Dni wolne", "Komfort", "Godziny transportu", "Odległość", "Atrakcje", "Dopasowanie", "Pewność danych"};
-        int max = profile.weight(criterion);
-        target.add(new CriterionResult(criterion.name(), names[criterion.ordinal()], max,
+        int max = profile.weight(criterion, isCar
+                ? com.travelfinder.trip.domain.TransportType.CAR
+                : com.travelfinder.trip.domain.TransportType.FLIGHT);
+        String label = isCar && criterion == Criterion.ATTRACTIONS ? "Atrakcyjność celu i regionu" : names[criterion.ordinal()];
+        target.add(new CriterionResult(criterion.name(), label, max,
                 factor == null ? null : (int) Math.round(max * clamp(factor, 0, 1)), detail));
     }
 

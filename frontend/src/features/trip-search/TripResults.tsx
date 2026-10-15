@@ -40,7 +40,7 @@ export function TripResults({ results, scores, status, error, searchedRequest, o
           <div className="travel-score-toolbar-heading">
             <span className="travel-score-kicker"><Icon name="sparkles" size={14}/> INTELIGENTNY RANKING</span>
             <h3>Travel Score <span>0–100</span></h3>
-            <p>Wybierz, na czym najbardziej Ci zależy. Punkty zostaną przeliczone bez ponownego wyszukiwania.</p>
+            <p>Wybierz, na czym najbardziej Ci zależy. Punkty zostaną przeliczone bez ponownego wyszukiwania. {searchedRequest?.transportTypes.includes('CAR') ? 'Dla samochodu najważniejsza jest atrakcyjność celu i potencjał regionu na weekend, a nie tylko krótki dojazd.' : ''}</p>
           </div>
           <div className="travel-score-profiles" role="group" aria-label="Priorytet oceniania podróży">
             {SCORE_PROFILES.map(item => <button key={item.id} type="button" className={`travel-score-profile${profile === item.id ? ' selected' : ''}`} title={item.description} aria-pressed={profile === item.id} onClick={() => onProfileChange(item.id)}>
@@ -58,7 +58,7 @@ export function TripResults({ results, scores, status, error, searchedRequest, o
             {scoreBusy && <span className="travel-score-calculating"><Icon name="refresh" size={13}/> Przeliczam…</span>}
           </div>
           {scoreError && <p className="travel-score-error" role="status"><Icon name="alert" size={14}/>{scoreError}</p>}
-          <p className="travel-score-method">Brak ceny konkretnego kursu = brak punktów za tę kategorię. Samochód ma szacowany koszt, zależny od spalania i ustawionych opłat; nie jest ceną oferty. Zobacz szczegóły punktacji na karcie.</p>
+          <p className="travel-score-method">{searchedRequest?.transportTypes.includes('CAR') ? 'Dla auta atrakcje mają 40–58 ze 100 możliwych punktów (zależnie od profilu). Redakcyjne znaczenie głównej atrakcji, możliwości zwiedzania okolicy i potencjał na weekend mają większą wagę niż bliskość celu. ' : ''}Brak ceny konkretnego kursu = brak punktów za tę kategorię. Samochód ma szacowany koszt, zależny od spalania i ustawionych opłat; nie jest ceną oferty. Zobacz szczegóły punktacji na karcie.</p>
         </div>
         <div className="results-grid">{ranked.map(({trip, score}, index) => <TripResultCard key={trip.id} trip={trip} index={index} score={score} />)}</div>
         <div className="results-footnote"><Icon name="info" size={15} /><span>Travel Score to pomocniczy ranking oparty na rozkładzie, parametrach wyszukiwania i lokalnym katalogu atrakcji. Dla auta dystans jest SZACUNKIEM drogowym, nie nawigacją. Dla innych środków odległość jest między centrami miast. Cena lotu pochodzi z historycznego cache; reklamowana cena minimalna FlixBusa NIE jest ceną konkretnego kursu i nie jest punktowana. {trainAccess === 'active' ? 'Pociągi: rozkład PLK bez cen.' : 'Pociągi: oczekiwanie na PLK.'} Autobusy: planowy rozkład <a href="https://transport.data.gouv.fr/datasets/flixbus-horaires-theoriques-du-reseau-europeen-1" target="_blank" rel="noopener noreferrer">FlixBus Europe GTFS</a> (ODbL 1.0). Auto: szacowane paliwo, parking i możliwe winiety. Przed wyjazdem sprawdź trasę i faktyczne opłaty. Dane paliw: <a href="https://www.fuel-prices.eu/" target="_blank" rel="noopener noreferrer">fuel-prices.eu (CC BY 4.0)</a> i NBP; przy niedostępności źródeł jawne ceny planistyczne.</span></div>
